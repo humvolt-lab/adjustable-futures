@@ -1,0 +1,1501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ADJUSTABLE FUTURES</title>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&display=swap');
+
+  :root {
+    --bg: #070710;
+    --surface: #0d0d1a;
+    --panel: #10101f;
+    --border: #22224a;
+    --accent: #c832ff;
+    --accent2: #7a1a99;
+    --dim: #3a2a55;
+    --text: #e0c0ff;
+    --text-dim: #5a4070;
+    --glow: rgba(200,50,255,0.15);
+    --red: #ff3366;
+    --green: #00ffaa;
+    --tape: #0a0a18;
+
+    /* Role colors */
+    --kick-color:   #ff2244;
+    --bass-color:   #ff8800;
+    --snare-color:  #ffee00;
+    --hihat-color:  #00ffaa;
+    --melody-color: #00ccff;
+    --stab-color:   #cc44ff;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    overflow: hidden;
+    touch-action: none;
+  }
+
+  /* === SCREENS === */
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; transition: opacity 0.6s; }
+  .screen.hidden { opacity: 0; pointer-events: none; }
+
+  /* === INIT SCREEN === */
+  #init {
+    align-items: center; justify-content: center;
+    background: radial-gradient(ellipse at 50% 60%, #1a1208 0%, var(--bg) 70%);
+    gap: 0;
+    padding: 32px 24px;
+  }
+
+  .logo-block {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .logo-main {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 52px;
+    letter-spacing: 6px;
+    color: var(--accent);
+    text-shadow: 0 0 40px rgba(200,50,255,0.5), 0 0 80px rgba(100,50,255,0.25);
+    line-height: 1;
+  }
+
+  .logo-sub {
+    font-size: 9px;
+    letter-spacing: 5px;
+    color: var(--dim);
+    text-transform: uppercase;
+    margin-top: 6px;
+  }
+
+  .init-panel {
+    width: 100%;
+    max-width: 360px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+
+  .init-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .init-label {
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  .bpm-display {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 48px;
+    color: var(--accent);
+    text-align: center;
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(200,150,42,0.3);
+  }
+
+  .bpm-unit {
+    font-size: 12px;
+    color: var(--dim);
+    letter-spacing: 3px;
+    text-align: center;
+    margin-top: -8px;
+  }
+
+  input[type=range] {
+    width: 100%;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: conic-gradient(#ff2244, #ff8800, #ffee00, #00ffaa, #00ccff, #cc44ff, #ff2244);
+    box-shadow: 0 0 10px rgba(200,50,255,0.6);
+    cursor: pointer;
+  }
+
+  select {
+    width: 100%;
+    background: var(--tape);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 10px 12px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c8962a'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    letter-spacing: 1px;
+  }
+
+  .init-btn {
+    width: 100%;
+    padding: 16px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    letter-spacing: 6px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .init-btn:active {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  /* === MAIN SCREEN === */
+  #main {
+    background: var(--bg);
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .header-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 4px;
+    color: var(--accent);
+  }
+
+  .header-info {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .pill {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+  }
+
+  .pill.active { color: var(--accent); border-color: var(--accent2); }
+
+  /* VU meter strip */
+  .vu-strip {
+    display: flex;
+    gap: 2px;
+    padding: 0 20px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    align-items: flex-end;
+    height: 36px;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .vu-bar {
+    flex: 1;
+    height: 30px;
+    background: var(--border);
+    border-radius: 1px;
+    transform-origin: bottom;
+    transform: scaleY(0.07);
+    transition: transform 0.05s, background 0.05s;
+    will-change: transform;
+  }
+
+  /* Waveform display */
+  .waveform-area {
+    padding: 8px 20px 6px;
+    background: var(--tape);
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    height: 82px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .waveform-label {
+    font-size: 8px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  canvas#waveCanvas {
+    width: 100%;
+    height: 60px;
+    display: block;
+    opacity: 0.85;
+    flex-shrink: 0;
+  }
+
+  /* State display */
+  .state-display {
+    padding: 8px 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    height: 64px;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .state-cell {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 0 10px;
+    background: var(--tape);
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    transition: border-color 0.15s;
+    overflow: hidden;
+  }
+
+  .state-cell.lit { border-color: var(--role-color, var(--accent2)); box-shadow: 0 0 8px var(--role-color, var(--accent2)); }
+
+  .state-cell-label {
+    font-size: 7px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .state-cell-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 16px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    line-height: 1;
+    transition: text-shadow 0.1s;
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .state-cell.lit .state-cell-val {
+    text-shadow: 0 0 12px var(--role-color, rgba(200,50,255,0.6));
+    color: var(--role-color, var(--accent));
+  }
+
+  /* Morph slider area */
+  .morph-section {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .morph-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+  }
+
+  .section-label {
+    font-size: 8px;
+    letter-spacing: 4px;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  .morph-val {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+
+  .morph-desc {
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    text-align: center;
+    font-style: italic;
+  }
+
+  /* Volume section */
+  .vol-section {
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .vol-row {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .vol-header {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  /* Beat grid */
+  .beat-grid {
+    padding: 8px 20px;
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 3px;
+    border-bottom: 1px solid var(--border);
+    height: 36px;
+    flex-shrink: 0;
+    overflow: hidden;
+    align-content: center;
+  }
+
+  .beat-dot {
+    aspect-ratio: 1;
+    border-radius: 1px;
+    background: var(--border);
+    transition: background 0.05s, box-shadow 0.05s;
+  }
+
+  .beat-dot.active {
+    background: var(--dot-color, var(--accent2));
+    opacity: 0.7;
+  }
+
+  .beat-dot.current {
+    background: var(--dot-color, var(--accent));
+    opacity: 1.0;
+    box-shadow: 0 0 8px var(--dot-color, rgba(200,50,255,0.7));
+  }
+
+  /* Main controls */
+  .controls {
+    flex: 1;
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    justify-content: flex-end;
+  }
+
+  /* Big play button */
+  .play-btn {
+    width: 100%;
+    padding: 0;
+    height: 64px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .play-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, #ff2244, #ff8800, #ffee00, #00ffaa, #00ccff, #cc44ff);
+    background-size: 200% 100%;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.15s;
+    animation: rainbowShift 3s linear infinite;
+  }
+  @keyframes rainbowShift {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+  .play-btn.playing::before { transform: scaleX(1); }
+  .play-btn.playing { color: #000; font-weight: bold; }
+  .play-btn span { position: relative; z-index: 1; }
+
+  /* Randomize button */
+  .rand-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 3px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+
+  .rand-btn:active {
+    background: var(--border);
+    color: var(--text);
+  }
+
+  /* Tape glow overlay */
+  .tape-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background: 
+      radial-gradient(ellipse at 50% 0%, rgba(200,50,255,0.04) 0%, transparent 70%),
+      repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px);
+    z-index: 100;
+  }
+
+  /* Scale display */
+  .scale-badge {
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--accent2);
+    text-transform: uppercase;
+    font-style: italic;
+  }
+
+  /* === LOOP RECALL SLOTS === */
+  .recall-section {
+    padding: 10px 20px 12px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    overflow: visible;
+  }
+
+  .recall-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+  }
+
+  .recall-slots {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 5px;
+  }
+
+  .slot-btn {
+    aspect-ratio: 1;
+    border: 1px solid var(--border);
+    border-radius: 2px;
+    background: var(--tape);
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.15s, background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .slot-btn.filled {
+    border-color: var(--accent2);
+    background: #1e1810;
+  }
+
+  .slot-btn.filled::after {
+    content: '';
+    position: absolute;
+    inset: 3px;
+    border-radius: 1px;
+    background: var(--accent2);
+    opacity: 0.5;
+  }
+
+  .slot-btn.active {
+    border-color: var(--accent);
+    background: #231f10;
+  }
+
+  .slot-btn.active::after {
+    background: conic-gradient(#ff2244, #ff8800, #ffee00, #00ffaa, #00ccff, #cc44ff, #ff2244);
+    opacity: 0.9;
+    animation: slotPulse 0.5s ease-in-out infinite alternate, slotSpin 3s linear infinite;
+  }
+  @keyframes slotSpin {
+    from { transform: rotate(0deg) scale(1.5); }
+    to   { transform: rotate(360deg) scale(1.5); }
+  }
+
+  .slot-btn.queued {
+    border-color: var(--accent);
+  }
+
+  .slot-btn.queued::after {
+    opacity: 0.35;
+    animation: slotPulse 0.3s ease-in-out infinite alternate;
+  }
+
+  @keyframes slotPulse {
+    from { opacity: 0.5; }
+    to   { opacity: 1.0; }
+  }
+
+  .slot-num {
+    position: relative;
+    z-index: 1;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1;
+  }
+
+  .slot-btn.filled .slot-num,
+  .slot-btn.active .slot-num { color: var(--bg); }
+
+</style>
+</head>
+<body>
+
+<!-- TAPE GRAIN -->
+<div class="tape-overlay"></div>
+
+<!-- INIT SCREEN -->
+<div class="screen" id="init">
+  <div class="logo-block">
+    <div class="logo-main">ADJUSTABLE<br>FUTURES</div>
+    <div class="logo-sub">Single Voice Morphic Synthesis Engine</div>
+  </div>
+
+  <div class="init-panel">
+    <div class="init-row">
+      <div class="init-label">Tempo</div>
+      <div class="bpm-display" id="bpmDisplay">82</div>
+      <div class="bpm-unit">BPM</div>
+      <input type="range" id="bpmSlider" min="55" max="140" value="82" step="1">
+    </div>
+
+    <div class="init-row">
+      <div class="init-label">Tonal System / Mode</div>
+      <select id="scaleSelect">
+        <optgroup label="Middle Eastern">
+          <option value="hijaz">Hijaz (D Eb F# G A Bb C)</option>
+          <option value="hijazKar">Hijaz Kar (C Db E F G Ab B)</option>
+          <option value="maqamRast">Maqam Rast (C D Eb+ F G A Bb)</option>
+          <option value="nahawand">Nahawand (C D Eb F G Ab B)</option>
+          <option value="bayati">Bayati (D Eb+ F G A Bb C)</option>
+          <option value="saba">Saba (D Eb F Gb A Bb C)</option>
+          <option value="kurd">Kurd (D Eb F G A Bb C)</option>
+          <option value="doubleHarmonic">Double Harmonic (C Db E F G Ab B)</option>
+          <option value="phrygianDom">Phrygian Dominant (C Db E F G Ab Bb)</option>
+          <option value="arabian">Arabian (C D E F Gb Ab Bb)</option>
+        </optgroup>
+        <optgroup label="Modal / Exotic">
+          <option value="phrygian">Phrygian (C Db Eb F G Ab Bb)</option>
+          <option value="locrian">Locrian (C Db Eb F Gb Ab Bb)</option>
+          <option value="wholeTone">Whole Tone (C D E F# G# A#)</option>
+          <option value="diminished">Diminished (C D Eb F Gb Ab A B)</option>
+          <option value="chromatic">Chromatic (all 12)</option>
+          <option value="enigmatic">Enigmatic (C Db E F# G# A# B)</option>
+          <option value="neapolitan">Neapolitan Minor (C Db Eb F G Ab B)</option>
+          <option value="hungarianMinor">Hungarian Minor (C D Eb F# G Ab B)</option>
+          <option value="prometheus">Prometheus (C D E F# A Bb)</option>
+        </optgroup>
+        <optgroup label="Pentatonic / World">
+          <option value="hirajoshi">Hirajoshi (C D Eb G Ab)</option>
+          <option value="insen">In-Sen (C Db F G Bb)</option>
+          <option value="iwato">Iwato (C Db F Gb Bb)</option>
+          <option value="kumoi">Kumoi (C D Eb G A)</option>
+          <option value="minorPentatonic">Minor Pentatonic</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <button class="init-btn" id="startBtn">INITIALIZE ENGINE</button>
+  </div>
+</div>
+
+<!-- MAIN SCREEN -->
+<div class="screen hidden" id="main">
+  <!-- Header -->
+  <div class="header">
+    <div class="header-title">ADJ.FUTURES</div>
+    <div class="header-info">
+      <span class="scale-badge" id="scaleBadge">MAQAM RAST</span>
+      <span class="pill active" id="bpmPill">82 BPM</span>
+    </div>
+  </div>
+
+  <!-- VU Meters -->
+  <div class="vu-strip" id="vuStrip"></div>
+
+  <!-- Waveform -->
+  <div class="waveform-area">
+    <div class="waveform-label">Morphic Output</div>
+    <canvas id="waveCanvas"></canvas>
+  </div>
+
+  <!-- State cells -->
+  <div class="state-display">
+    <div class="state-cell" id="cellWave">
+      <span class="state-cell-label">Waveform</span>
+      <span class="state-cell-val" id="valWave">SAW</span>
+    </div>
+    <div class="state-cell" id="cellFilter">
+      <span class="state-cell-label">Filter</span>
+      <span class="state-cell-val" id="valFilter">LP</span>
+    </div>
+    <div class="state-cell" id="cellRole">
+      <span class="state-cell-label">Voice Role</span>
+      <span class="state-cell-val" id="valRole">KICK</span>
+    </div>
+  </div>
+
+  <!-- Morph Speed Slider -->
+  <div class="morph-section">
+    <div class="morph-header">
+      <span class="section-label">Morph Speed</span>
+      <span class="morph-val" id="morphVal">50ms</span>
+    </div>
+    <input type="range" id="morphSlider" min="1" max="2000" value="50" step="1">
+    <div class="morph-desc" id="morphDesc">filter & wave morph time — pitch locks to grid</div>
+  </div>
+
+  <!-- Volume controls -->
+  <div class="vol-section">
+    <div class="vol-row">
+      <div class="vol-header">
+        <span class="section-label">High Freq Vol</span>
+        <span class="morph-val" id="hiVolVal">-24dB</span>
+      </div>
+      <input type="range" id="hiVolSlider" min="-24" max="0" value="-24" step="1">
+    </div>
+    <div class="vol-row">
+      <div class="vol-header">
+        <span class="section-label">Drive</span>
+        <span class="morph-val" id="driveVal">0.05</span>
+      </div>
+      <input type="range" id="driveSlider" min="0.05" max="0.9" value="0.05" step="0.05">
+    </div>
+  </div>
+
+  <!-- Beat grid -->
+  <div class="beat-grid" id="beatGrid"></div>
+
+
+  <!-- Loop Recall Slots -->
+  <div class="recall-section">
+    <div class="recall-header">
+      <span class="section-label">Loop Memory</span>
+      <span class="section-label" id="slotStatus">— empty —</span>
+    </div>
+    <div class="recall-slots" id="recallSlots"></div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="play-btn" id="playBtn"><span>▶  PLAY</span></button>
+    <button class="rand-btn" id="randBtn">⟳ RANDOMIZE PROBABILITIES</button>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// SCALES
+// ============================================================
+const SCALES = {
+  hijaz:          [0,1,4,5,7,8,10],
+  hijazKar:       [0,1,4,5,7,8,11],
+  maqamRast:      [0,2,3,5,7,9,10],
+  nahawand:       [0,2,3,5,7,8,11],
+  bayati:         [0,1,3,5,7,8,10],
+  saba:           [0,1,3,4,8,9,10],
+  kurd:           [0,1,3,5,7,8,10],
+  doubleHarmonic: [0,1,4,5,7,8,11],
+  phrygianDom:    [0,1,4,5,7,8,10],
+  arabian:        [0,2,4,5,6,8,10],
+  phrygian:       [0,1,3,5,7,8,10],
+  locrian:        [0,1,3,5,6,8,10],
+  wholeTone:      [0,2,4,6,8,10],
+  diminished:     [0,2,3,5,6,8,9,11],
+  chromatic:      [0,1,2,3,4,5,6,7,8,9,10,11],
+  enigmatic:      [0,1,4,6,8,10,11],
+  neapolitan:     [0,1,3,5,7,8,11],
+  hungarianMinor: [0,2,3,6,7,8,11],
+  prometheus:     [0,2,4,6,9,10],
+  hirajoshi:      [0,2,3,7,8],
+  insen:          [0,1,5,7,10],
+  iwato:          [0,1,5,6,10],
+  kumoi:          [0,2,3,7,9],
+  minorPentatonic:[0,3,5,7,10],
+};
+const SCALE_NAMES = {
+  hijaz:'HIJAZ', hijazKar:'HIJAZ KAR', maqamRast:'MAQAM RAST',
+  nahawand:'NAHAWAND', bayati:'BAYATI', saba:'SABA', kurd:'KURD',
+  doubleHarmonic:'DBL HARMONIC', phrygianDom:'PHRYG DOM', arabian:'ARABIAN',
+  phrygian:'PHRYGIAN', locrian:'LOCRIAN', wholeTone:'WHOLE TONE',
+  diminished:'DIMINISHED', chromatic:'CHROMATIC', enigmatic:'ENIGMATIC',
+  neapolitan:'NEAPOLITAN', hungarianMinor:'HUNG MINOR', prometheus:'PROMETHEUS',
+  hirajoshi:'HIRAJOSHI', insen:'IN-SEN', iwato:'IWATO', kumoi:'KUMOI',
+  minorPentatonic:'MIN PENTA',
+};
+const ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+// Role colors for display
+const ROLE_COLORS = {
+  kick:   '#ff2244',
+  bass:   '#ff8800',
+  snare:  '#ffee00',
+  hihat:  '#00ffaa',
+  melody: '#00ccff',
+  stab:   '#cc44ff',
+};
+
+// ============================================================
+// ROLES
+// ============================================================
+const ROLES = {
+  kick:   { id:'kick',   label:'KICK',   wave:'sine',     filterFreq:80,   filterQ:0.7, att:0.001, dec:0.45, sus:0,    rel:0.2,  noise:0,    oct:0,  pitchDrop:true  },
+  bass:   { id:'bass',   label:'BASS',   wave:'triangle', filterFreq:420,  filterQ:1.5, att:0.008, dec:0.5,  sus:0.25, rel:0.3,  noise:0,    oct:-1, pitchDrop:false },
+  snare:  { id:'snare',  label:'SNARE',  wave:'sawtooth', filterFreq:2800, filterQ:2.5, att:0.001, dec:0.18, sus:0,    rel:0.38, noise:0.85, oct:1,  pitchDrop:false },
+  hihat:  { id:'hihat',  label:'HIHAT',  wave:'square',   filterFreq:8000, filterQ:0.8, att:0.001, dec:0.05, sus:0,    rel:0.04, noise:0.9,  oct:2,  pitchDrop:false },
+  melody: { id:'melody', label:'MELODY', wave:'triangle', filterFreq:1600, filterQ:10,  att:0.012, dec:0.4,  sus:0.4,  rel:0.4,  noise:0,    oct:1,  pitchDrop:false },
+  stab:   { id:'stab',   label:'STAB',   wave:'sawtooth', filterFreq:900,  filterQ:16,  att:0.001, dec:0.1,  sus:0,    rel:0.12, noise:0,    oct:0,  pitchDrop:false },
+};
+
+// ============================================================
+// MELODIC PROGRESSION ENGINE
+// Patterns are built around a phrase: root, movement, tension, resolve
+// Randomize nudges into new territory while respecting voice leading
+// ============================================================
+
+// Current phrase state — persists across loops, evolves on randomize
+let phraseRoot = 2;       // index into scale (starts on 2nd degree for interest)
+let phraseDirection = 1;  // +1 ascending, -1 descending
+let phraseTension = 0.3;  // 0=stable, 1=restless — affects note choice spread
+let phraseOctaveShift = 0;// -1, 0, +1
+
+// The locked 16-step sequence — rebuilt each loop start if pending
+let lockedPattern = [];   // roleId or null per step
+let lockedMidi    = [];   // midi note number per step (melodic voice leading)
+let pendingPattern = null; // queued for next loop boundary
+
+// Melodic note memory — last played midi per voice for smooth voice leading
+let lastMidi = { melody:45, bass:33, stab:45, kick:33, snare:50, hihat:62 };
+
+function midiToFreq(midi) { return 440 * Math.pow(2, (midi-69)/12); }
+
+function scaleNotes(scaleName, rootSemitone, octave) {
+  // Return array of midi notes spanning ~2.5 octaves for voice leading
+  const scale = SCALES[scaleName] || SCALES.maqamRast;
+  const notes = [];
+  for (let oct = octave-1; oct <= octave+2; oct++) {
+    for (const semi of scale) {
+      notes.push(12 + rootSemitone + semi + oct*12);
+    }
+  }
+  return notes.sort((a,b) => a-b);
+}
+
+function closestScaleNote(targetMidi, scaleName, rootSemitone, octave, octaveBias) {
+  const notes = scaleNotes(scaleName, rootSemitone, octave + (octaveBias||0));
+  // Find closest note, with slight bias toward movement
+  let best = notes[0], bestDist = Math.abs(best - targetMidi);
+  for (const n of notes) {
+    const d = Math.abs(n - targetMidi);
+    if (d < bestDist) { best = n; bestDist = d; }
+  }
+  return best;
+}
+
+function nextMelodicNote(roleId, stepIdx, totalSteps) {
+  const role = ROLES[roleId];
+  const rootSemitone = ROOTS.indexOf(rootNote);
+  const scale = SCALES[currentScale] || SCALES.maqamRast;
+  const scaleNotesMidi = scaleNotes(currentScale, rootSemitone, octaveBase + (role.oct||0));
+
+  const prev = lastMidi[roleId] || scaleNotesMidi[Math.floor(scaleNotesMidi.length/2)];
+
+  // Voice leading: prefer small steps (±2-5 semitones), occasionally leap
+  // Tension controls how far we wander
+  const stepSize = phraseTension < 0.4
+    ? (Math.random() < 0.7 ? 2 : 5)   // stable: mostly steps
+    : phraseTension < 0.7
+    ? (Math.random() < 0.5 ? 3 : 7)   // medium: steps + leaps
+    : (Math.random() < 0.3 ? 2 : 9);  // restless: leaps dominate
+
+  // Direction with drift
+  let dir = phraseDirection;
+  if (Math.random() < 0.25) dir = -dir; // occasional contrary motion
+
+  // Phrase position shapes contour: rise in first half, resolve in second
+  const pos = stepIdx / totalSteps;
+  if (pos > 0.7 && phraseTension > 0.3) dir = -Math.abs(dir); // resolve downward late
+
+  const target = prev + dir * stepSize * (0.7 + Math.random()*0.6);
+
+  // Clamp to reasonable range per voice
+  const ranges = { kick:[24,48], bass:[28,52], snare:[48,72], hihat:[60,80], melody:[48,76], stab:[40,68] };
+  const [lo, hi] = ranges[roleId] || [36,72];
+  const clamped = Math.max(lo, Math.min(hi, Math.round(target)));
+
+  // Snap to nearest scale note
+  const snapped = closestScaleNote(clamped, currentScale, rootSemitone, octaveBase, role.oct||0);
+  const final = Math.max(lo, Math.min(hi, snapped));
+
+  lastMidi[roleId] = final;
+  return final;
+}
+
+// ============================================================
+// PATTERN BUILDER
+// ============================================================
+let currentProbMap = {
+  kickStrong:0.92, kickWeak:0.7,  kickGhost:0.12, kickOdd:0.04,
+  bassOn:0.75,     bassOff:0.25,  bassGhost:0.08,
+  snareOn:0.95,    snareOff:0.18, snareGhost:0.06,
+  hihatOn:0.7,     hihatOff:0.4,
+  melOn:0.55,      melOff:0.12,
+  stabOn:0.45,     stabOff:0.04,
+};
+
+function buildPattern(pm) {
+  const stepProbs = { kick:[], bass:[], snare:[], hihat:[], melody:[], stab:[] };
+  for (let i=0; i<16; i++) {
+    stepProbs.kick[i]   = [0,8].includes(i)?pm.kickStrong:[4,12].includes(i)?pm.kickWeak:i%2===0?pm.kickGhost:pm.kickOdd;
+    stepProbs.bass[i]   = [0,4,8,12].includes(i)?pm.bassOn:i%2===0?pm.bassOff:pm.bassGhost;
+    stepProbs.snare[i]  = [4,12].includes(i)?pm.snareOn:[2,6,10,14].includes(i)?pm.snareOff:pm.snareGhost;
+    stepProbs.hihat[i]  = i%2===0?pm.hihatOn:pm.hihatOff;
+    stepProbs.melody[i] = [0,3,5,8,11,13].includes(i)?pm.melOn:pm.melOff;
+    stepProbs.stab[i]   = [2,9,13].includes(i)?pm.stabOn:pm.stabOff;
+  }
+  const order = ['kick','snare','bass','melody','stab','hihat'];
+  const pat = [], midi = [];
+  for (let i=0; i<16; i++) {
+    let chosen = null;
+    for (const rid of order) {
+      if (Math.random() < stepProbs[rid][i]) { chosen = rid; break; }
+    }
+    pat[i] = chosen;
+    midi[i] = chosen ? nextMelodicNote(chosen, i, 16) : null;
+  }
+  return { pat, midi };
+}
+
+function commitPattern(built) {
+  lockedPattern = built.pat;
+  lockedMidi    = built.midi;
+  updateBeatGridDots();
+}
+
+function randomizeProbMap() {
+  const nudge = (v, lo, hi, amt) => Math.max(lo, Math.min(hi, v + (Math.random()-0.5)*amt));
+  currentProbMap = {
+    kickStrong: nudge(currentProbMap.kickStrong, 0.5, 1.0, 0.4),
+    kickWeak:   nudge(currentProbMap.kickWeak,   0.2, 0.95, 0.5),
+    kickGhost:  nudge(currentProbMap.kickGhost,  0, 0.5, 0.3),
+    kickOdd:    nudge(currentProbMap.kickOdd,    0, 0.25, 0.15),
+    bassOn:     nudge(currentProbMap.bassOn,     0.3, 1.0, 0.5),
+    bassOff:    nudge(currentProbMap.bassOff,    0, 0.6, 0.35),
+    bassGhost:  nudge(currentProbMap.bassGhost,  0, 0.25, 0.2),
+    snareOn:    nudge(currentProbMap.snareOn,    0.4, 1.0, 0.4),
+    snareOff:   nudge(currentProbMap.snareOff,   0, 0.45, 0.3),
+    snareGhost: nudge(currentProbMap.snareGhost, 0, 0.2, 0.15),
+    hihatOn:    nudge(currentProbMap.hihatOn,    0.2, 1.0, 0.5),
+    hihatOff:   nudge(currentProbMap.hihatOff,   0.05, 0.8, 0.4),
+    melOn:      nudge(currentProbMap.melOn,      0.1, 0.9, 0.5),
+    melOff:     nudge(currentProbMap.melOff,     0, 0.35, 0.25),
+    stabOn:     nudge(currentProbMap.stabOn,     0.05, 0.85, 0.4),
+    stabOff:    nudge(currentProbMap.stabOff,    0, 0.18, 0.12),
+  };
+
+  phraseDirection = Math.random() < 0.35 ? -phraseDirection : phraseDirection;
+  phraseTension = Math.max(0.1, Math.min(0.9, phraseTension + (Math.random()-0.5)*0.4));
+  phraseOctaveShift = Math.random() < 0.2 ? (Math.floor(Math.random()*3)-1) : phraseOctaveShift;
+
+  if (Math.random() < 0.4) {
+    const rootSemi = ROOTS.indexOf(rootNote);
+    const steps = [-2,-1,0,0,0,1,2];
+    const shift = steps[Math.floor(Math.random()*steps.length)];
+    rootNote = ROOTS[(rootSemi + shift + 12) % 12];
+  }
+
+  // Apply immediately — mid-loop, mid-phrase, doesn't matter
+  const built = buildPattern(currentProbMap);
+  commitPattern(built);
+  activeSlotIdx = -1;
+  pendingPattern = null;
+  renderSlots();
+  updateSlotStatus();
+}
+
+// ============================================================
+// STATE
+// ============================================================
+let audioCtx = null;
+let isPlaying = false;
+let currentScale = 'maqamRast';
+let currentBPM = 82;
+let morphTime = 0.08;
+let hiVolDb = -24;
+let driveAmount = 0.05;
+let rootNote = 'D';
+let octaveBase = 2;
+let currentStep = 0;
+let schedulerId = null;
+let nextStepTime = 0;
+
+let masterGain, hiShelfFilter, compressor, waveshaper, analyserNode, filterNode, noiseGainNode, noiseBufferSrc;
+let filterFreqNow = 800;
+let filterQNow = 2;
+let noiseNow = 0;
+
+// ============================================================
+// AUDIO INIT
+// ============================================================
+function initAudio(bpm, scaleName) {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  currentBPM = bpm;
+  currentScale = scaleName;
+
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = 0.82;
+  masterGain.connect(audioCtx.destination);
+
+  hiShelfFilter = audioCtx.createBiquadFilter();
+  hiShelfFilter.type = 'highshelf';
+  hiShelfFilter.frequency.value = 3500;
+  hiShelfFilter.gain.value = hiVolDb;
+  hiShelfFilter.connect(masterGain);
+
+  compressor = audioCtx.createDynamicsCompressor();
+  compressor.threshold.value = -16;
+  compressor.knee.value = 8;
+  compressor.ratio.value = 3;
+  compressor.attack.value = 0.003;
+  compressor.release.value = 0.12;
+  compressor.connect(hiShelfFilter);
+
+  waveshaper = audioCtx.createWaveShaper();
+  waveshaper.curve = makeDistCurve(driveAmount * 180);
+  waveshaper.oversample = '4x';
+  waveshaper.connect(compressor);
+
+  analyserNode = audioCtx.createAnalyser();
+  analyserNode.fftSize = 512;
+  analyserNode.connect(waveshaper);
+
+  filterNode = audioCtx.createBiquadFilter();
+  filterNode.type = 'lowpass';
+  filterNode.frequency.value = 800;
+  filterNode.Q.value = 2;
+  filterNode.connect(analyserNode);
+
+  const bufSize = audioCtx.sampleRate * 3;
+  const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for (let i=0; i<bufSize; i++) nd[i] = Math.random()*2-1;
+  noiseBufferSrc = audioCtx.createBufferSource();
+  noiseBufferSrc.buffer = noiseBuf;
+  noiseBufferSrc.loop = true;
+  noiseGainNode = audioCtx.createGain();
+  noiseGainNode.gain.value = 0;
+  noiseBufferSrc.connect(noiseGainNode);
+  noiseGainNode.connect(filterNode);
+  noiseBufferSrc.start();
+
+  const built = buildPattern(currentProbMap);
+  commitPattern(built);
+  initBeatGrid();
+  startWaveformLoop();
+  startVU();
+}
+
+function makeDistCurve(amount) {
+  const n=256, c=new Float32Array(n);
+  for(let i=0;i<n;i++){const x=(i*2/n)-1; c[i]=(Math.PI+amount)*x/(Math.PI+amount*Math.abs(x));}
+  return c;
+}
+
+// ============================================================
+// FIRE NOTE — role-specific filter morphs
+// ============================================================
+function fireNote(roleId, midiNote, startTime) {
+  const role = ROLES[roleId];
+  const freq = midiToFreq(midiNote);
+  const t = startTime;
+  const mt = morphTime; // live value — slider affects immediately
+
+  filterNode.frequency.cancelScheduledValues(t);
+  filterNode.Q.cancelScheduledValues(t);
+
+  // mt drives ALL morph durations — slider is fully real-time
+  // min floors keep percussive snap even at mt=0
+  const kickDur   = Math.max(0.02,  mt * 2.0);   // kick: slam filter shut
+  const snareCrk  = Math.max(0.004, mt * 0.15);  // snare crack: fast snap open
+  const snareTail = Math.max(0.12,  mt * 4.0);   // snare tail: noise bleed
+  const melDur    = Math.max(0.05,  mt * 3.0);   // melody bloom
+  const bassDur   = Math.max(0.03,  mt * 2.5);   // bass settle
+  const stabDur   = Math.max(0.01,  mt * 1.2);   // stab spike
+  const hatDur    = Math.max(0.003, mt * 0.5);   // hihat snap
+
+  if (roleId === 'kick') {
+    filterNode.frequency.setValueAtTime(Math.max(filterFreqNow, 500), t);
+    filterNode.frequency.exponentialRampToValueAtTime(80, t + kickDur);
+    filterNode.Q.setValueAtTime(4, t);
+    filterNode.Q.linearRampToValueAtTime(0.7, t + kickDur);
+  } else if (roleId === 'snare') {
+    filterNode.frequency.setValueAtTime(Math.min(filterFreqNow, 600), t);
+    filterNode.frequency.exponentialRampToValueAtTime(3200, t + snareCrk);
+    filterNode.frequency.exponentialRampToValueAtTime(1400, t + snareTail);
+    filterNode.Q.setValueAtTime(3, t);
+    filterNode.Q.linearRampToValueAtTime(1, t + snareTail);
+  } else if (roleId === 'melody') {
+    const startFreq = Math.max(200, Math.min(filterFreqNow, 800));
+    filterNode.frequency.setValueAtTime(startFreq, t);
+    filterNode.frequency.exponentialRampToValueAtTime(role.filterFreq, t + melDur);
+    filterNode.Q.setValueAtTime(Math.max(1, filterQNow), t);
+    filterNode.Q.exponentialRampToValueAtTime(role.filterQ, t + melDur);
+  } else if (roleId === 'bass') {
+    filterNode.frequency.setValueAtTime(filterFreqNow, t);
+    filterNode.frequency.exponentialRampToValueAtTime(role.filterFreq, t + bassDur);
+    filterNode.Q.setValueAtTime(Math.max(0.5, filterQNow), t);
+    filterNode.Q.linearRampToValueAtTime(role.filterQ, t + bassDur);
+  } else if (roleId === 'stab') {
+    filterNode.frequency.setValueAtTime(2800, t);
+    filterNode.frequency.exponentialRampToValueAtTime(role.filterFreq, t + stabDur);
+    filterNode.Q.setValueAtTime(20, t);
+    filterNode.Q.linearRampToValueAtTime(role.filterQ, t + stabDur);
+  } else if (roleId === 'hihat') {
+    filterNode.frequency.setValueAtTime(filterFreqNow, t);
+    filterNode.frequency.exponentialRampToValueAtTime(role.filterFreq, t + hatDur);
+    filterNode.Q.setValueAtTime(filterQNow, t);
+    filterNode.Q.linearRampToValueAtTime(role.filterQ, t + hatDur);
+  }
+
+  filterFreqNow = role.filterFreq;
+  filterQNow = role.filterQ;
+
+  // Noise morph
+  noiseGainNode.gain.cancelScheduledValues(t);
+  noiseGainNode.gain.setValueAtTime(noiseNow, t);
+  if (role.noise > 0) {
+    noiseGainNode.gain.linearRampToValueAtTime(role.noise * 0.55, t + 0.003);
+    if (roleId === 'snare') {
+      noiseGainNode.gain.setTargetAtTime(0.05, t + role.dec, role.rel * 0.9 + 0.06);
+      noiseGainNode.gain.setTargetAtTime(0, t + role.dec + role.rel, 0.08);
+    } else {
+      noiseGainNode.gain.setTargetAtTime(0, t + role.dec * 0.5, role.rel * 0.3 + 0.02);
+    }
+    noiseNow = 0;
+  } else {
+    noiseGainNode.gain.linearRampToValueAtTime(0, t + (roleId==='kick' ? Math.max(0.02, mt*0.8) : mt + 0.03));
+    noiseNow = 0;
+  }
+
+  // Oscillator
+  const osc = audioCtx.createOscillator();
+  osc.type = role.wave;
+  if (role.pitchDrop) {
+    osc.frequency.setValueAtTime(freq * 4, t);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.6, t + 0.06);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.4, t + 0.22);
+  } else {
+    osc.frequency.setValueAtTime(freq, t);
+  }
+
+  const env = audioCtx.createGain();
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.linearRampToValueAtTime(0.85, t + role.att);
+  env.gain.setTargetAtTime(role.sus * 0.85, t + role.att, role.dec * 0.35 + 0.001);
+  const noteEnd = t + role.att + role.dec + role.rel + 0.1;
+  env.gain.setTargetAtTime(0.0001, t + role.att + role.dec, role.rel * 0.4 + 0.001);
+
+  osc.connect(env);
+  env.connect(filterNode);
+  osc.start(t);
+  osc.stop(noteEnd + 0.05);
+
+  // DOM
+  const domDelay = Math.max(0, (t - audioCtx.currentTime) * 1000);
+  setTimeout(() => {
+    const wmap={sine:'SINE',sawtooth:'SAW',square:'SQR',triangle:'TRI'};
+    const fmap={kick:'LP↓',bass:'LP',snare:'BP↑',hihat:'HP',melody:'LP↑',stab:'BP'};
+    const vw=document.getElementById('valWave');
+    const vf=document.getElementById('valFilter');
+    const vr=document.getElementById('valRole');
+    if(vw) vw.textContent=wmap[role.wave]||role.wave.slice(0,4).toUpperCase();
+    if(vf) vf.textContent=fmap[roleId]||'LP';
+    if(vr) vr.textContent=role.label;
+    const roleColor = ROLE_COLORS[roleId] || 'var(--accent)';
+    ['cellWave','cellFilter','cellRole'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){
+        el.style.setProperty('--role-color', roleColor);
+        el.classList.add('lit');
+        setTimeout(()=>el.classList.remove('lit'),200);
+      }
+    });
+  }, domDelay);
+}
+
+// ============================================================
+// SEQUENCER — loop with pending pattern swap at bar boundary
+// ============================================================
+function scheduler() {
+  const stepSec = (60 / currentBPM) / 4;
+  while (nextStepTime < audioCtx.currentTime + 0.14) {
+    const step = currentStep % 16;
+
+    // Bar boundary marker — pending/queued handled immediately now
+
+    const roleId = lockedPattern[step];
+    const midiNote = lockedMidi[step];
+
+    if (roleId && midiNote) {
+      fireNote(roleId, midiNote, nextStepTime);
+    }
+
+    // Beat grid
+    const t = nextStepTime;
+    const s = step;
+    const rId = roleId;
+    setTimeout(() => {
+      document.querySelectorAll('.beat-dot').forEach((d,i) => {
+        d.classList.remove('current');
+        if (i===s) {
+          d.classList.add('current');
+          if (rId) d.style.setProperty('--dot-color', ROLE_COLORS[rId] || 'var(--accent)');
+        }
+      });
+    }, Math.max(0, (t - audioCtx.currentTime)*1000));
+
+    currentStep++;
+    nextStepTime += stepSec;
+  }
+  schedulerId = setTimeout(scheduler, 20);
+}
+
+function startSequencer() {
+  currentStep = 0;
+  nextStepTime = audioCtx.currentTime + 0.05;
+  scheduler();
+}
+
+function stopSequencer() {
+  if (schedulerId) clearTimeout(schedulerId);
+  schedulerId = null;
+  currentStep = 0;
+  document.querySelectorAll('.beat-dot').forEach(d=>d.classList.remove('current'));
+}
+
+// ============================================================
+// BEAT GRID
+// ============================================================
+function initBeatGrid() {
+  const grid=document.getElementById('beatGrid');
+  if(!grid) return;
+  grid.innerHTML='';
+  for(let i=0;i<16;i++){
+    const d=document.createElement('div');
+    d.className='beat-dot'; d.id='dot'+i;
+    grid.appendChild(d);
+  }
+  updateBeatGridDots();
+}
+
+function updateBeatGridDots() {
+  for(let i=0;i<16;i++){
+    const d=document.getElementById('dot'+i);
+    if(!d) continue;
+    const rid = lockedPattern[i];
+    if(rid) {
+      d.classList.add('active');
+      d.style.setProperty('--dot-color', ROLE_COLORS[rid] || 'var(--accent)');
+    } else {
+      d.classList.remove('active');
+      d.style.removeProperty('--dot-color');
+    }
+  }
+}
+
+// ============================================================
+// WAVEFORM + VU
+// ============================================================
+function startWaveformLoop() {
+  const canvas=document.getElementById('waveCanvas');
+  if(!canvas) return;
+  const ctx2=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=canvas.offsetWidth*dpr; canvas.height=60*dpr;
+  ctx2.scale(dpr,dpr);
+  const W=canvas.offsetWidth, H=60;
+  const buf=new Float32Array(analyserNode.fftSize);
+  function draw(){
+    requestAnimationFrame(draw);
+    ctx2.clearRect(0,0,W,H);
+    if(!isPlaying){
+      ctx2.strokeStyle='rgba(200,150,42,0.2)'; ctx2.lineWidth=1;
+      ctx2.beginPath(); ctx2.moveTo(0,H/2); ctx2.lineTo(W,H/2); ctx2.stroke(); return;
+    }
+    analyserNode.getFloatTimeDomainData(buf);
+    const hue = (Date.now() / 30) % 360;
+    const grad = ctx2.createLinearGradient(0,0,W,0);
+    grad.addColorStop(0,   `hsl(${hue},100%,60%)`);
+    grad.addColorStop(0.33,`hsl(${(hue+90)%360},100%,60%)`);
+    grad.addColorStop(0.66,`hsl(${(hue+180)%360},100%,60%)`);
+    grad.addColorStop(1,   `hsl(${(hue+270)%360},100%,60%)`);
+    ctx2.strokeStyle=grad; ctx2.lineWidth=1.5;
+    ctx2.shadowColor=`hsl(${hue},100%,60%)`; ctx2.shadowBlur=6;
+    ctx2.beginPath();
+    for(let i=0;i<buf.length;i++){
+      const x=(i/buf.length)*W, y=((buf[i]+1)/2)*H;
+      i===0?ctx2.moveTo(x,y):ctx2.lineTo(x,y);
+    }
+    ctx2.stroke(); ctx2.shadowBlur=0;
+  }
+  draw();
+}
+
+function initVU() {
+  const strip=document.getElementById('vuStrip');
+  if(!strip) return;
+  strip.innerHTML='';
+  for(let i=0;i<24;i++){
+    const b=document.createElement('div');
+    b.className='vu-bar'; strip.appendChild(b);
+  }
+}
+
+function startVU() {
+  const buf=new Float32Array(analyserNode.fftSize);
+  function anim(){
+    requestAnimationFrame(anim);
+    const bars=document.querySelectorAll('.vu-bar');
+    if(!isPlaying){bars.forEach(b=>b.style.transform='scaleY(0.07)');return;}
+    analyserNode.getFloatTimeDomainData(buf);
+    const chunk=Math.floor(buf.length/bars.length);
+    bars.forEach((bar,i)=>{
+      let s=0;
+      for(let j=i*chunk;j<(i+1)*chunk;j++) s+=Math.abs(buf[j]||0);
+      const v=Math.min(1,(s/chunk)*2.5);
+      bar.style.transform='scaleY('+Math.max(0.07,v)+')';
+      const bHue = (i / bars.length) * 300;
+      bar.style.background = v > 0.07 ? `hsl(${bHue},100%,${40+v*30}%)` : 'var(--border)';
+    });
+  }
+  anim();
+}
+
+
+// ============================================================
+// LOOP RECALL — 8 slots, auto-saved on randomize
+// ============================================================
+const MAX_SLOTS = 8;
+const recallSlots = []; // each: { pattern, midi, probMap, phraseRoot, phraseTension, phraseDirection, rootNote, octaveBase }
+let activeSlotIdx = -1; // currently playing slot (-1 = live)
+let queuedSlotIdx = -1; // queued for next bar
+
+function saveToNextSlot() {
+  // Save the CURRENT (outgoing) pattern before randomize takes over
+  const slot = {
+    pattern: [...lockedPattern],
+    midi:    [...lockedMidi],
+    probMap: Object.assign({}, currentProbMap),
+    phraseTension, phraseDirection, phraseRoot,
+    rootNote, octaveBase,
+  };
+  if (recallSlots.length < MAX_SLOTS) {
+    recallSlots.push(slot);
+    activeSlotIdx = recallSlots.length - 1;
+  } else {
+    // Find oldest non-active slot to overwrite
+    let oldest = (activeSlotIdx + 1) % MAX_SLOTS;
+    recallSlots[oldest] = slot;
+    activeSlotIdx = oldest;
+  }
+  renderSlots();
+  updateSlotStatus();
+}
+
+function recallSlot(idx) {
+  if (!recallSlots[idx]) return;
+  // Apply immediately — mid-loop swap sounds like another morph event
+  applySlot(idx);
+}
+
+function applySlot(idx) {
+  const slot = recallSlots[idx];
+  if (!slot) return;
+  lockedPattern  = [...slot.pattern];
+  lockedMidi     = [...slot.midi];
+  currentProbMap = Object.assign({}, slot.probMap);
+  phraseTension  = slot.phraseTension;
+  phraseDirection = slot.phraseDirection;
+  phraseRoot     = slot.phraseRoot;
+  rootNote       = slot.rootNote;
+  octaveBase     = slot.octaveBase;
+  activeSlotIdx  = idx;
+  queuedSlotIdx  = -1;
+  updateBeatGridDots();
+  renderSlots();
+  updateSlotStatus();
+}
+
+function renderSlots() {
+  const container = document.getElementById('recallSlots');
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i = 0; i < MAX_SLOTS; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'slot-btn';
+    const num = document.createElement('span');
+    num.className = 'slot-num';
+    num.textContent = i + 1;
+    btn.appendChild(num);
+
+    if (recallSlots[i]) {
+      btn.classList.add('filled');
+      if (i === activeSlotIdx) btn.classList.add('active');
+      if (i === queuedSlotIdx) btn.classList.add('queued');
+      btn.addEventListener('click', () => recallSlot(i));
+    }
+    container.appendChild(btn);
+  }
+}
+
+function updateSlotStatus() {
+  const el = document.getElementById('slotStatus');
+  if (!el) return;
+  if (queuedSlotIdx >= 0) {
+    el.textContent = 'queued → ' + (queuedSlotIdx + 1);
+  } else if (activeSlotIdx >= 0) {
+    el.textContent = 'playing ' + (activeSlotIdx + 1) + ' / ' + recallSlots.length;
+  } else {
+    el.textContent = recallSlots.length ? recallSlots.length + ' stored' : '— empty —';
+  }
+}
+
+
+// ============================================================
+// CONTROLS
+// ============================================================
+document.getElementById('bpmSlider').addEventListener('input',function(){
+  document.getElementById('bpmDisplay').textContent=this.value;
+});
+
+document.getElementById('startBtn').addEventListener('click',function(){
+  const bpm=parseInt(document.getElementById('bpmSlider').value);
+  const scale=document.getElementById('scaleSelect').value;
+  document.getElementById('bpmPill').textContent=bpm+' BPM';
+  document.getElementById('scaleBadge').textContent=SCALE_NAMES[scale]||scale.toUpperCase();
+  initAudio(bpm,scale);
+  initVU();
+  document.getElementById('init').classList.add('hidden');
+  document.getElementById('main').classList.remove('hidden');
+});
+
+document.getElementById('playBtn').addEventListener('click',function(){
+  if(!audioCtx) return;
+  isPlaying=!isPlaying;
+  const btn=document.getElementById('playBtn');
+  if(isPlaying){
+    btn.classList.add('playing');
+    btn.querySelector('span').textContent='■  STOP';
+    startSequencer();
+  } else {
+    btn.classList.remove('playing');
+    btn.querySelector('span').textContent='▶  PLAY';
+    stopSequencer();
+  }
+});
+
+document.getElementById('randBtn').addEventListener('click',function(){
+  saveToNextSlot();    // save outgoing loop before it changes
+  randomizeProbMap(); // queues pendingPattern for next bar
+  const btn=document.getElementById('randBtn');
+  btn.style.borderColor='var(--accent)'; btn.style.color='var(--text)';
+  setTimeout(()=>{btn.style.borderColor='';btn.style.color='';},300);
+});
+
+// Morph slider — updates morphTime live, affects all subsequent note morphs immediately
+document.getElementById('morphSlider').addEventListener('input',function(){
+  const ms=parseInt(this.value);
+  morphTime=ms/1000;
+  document.getElementById('morphVal').textContent=ms+'ms';
+  const desc=document.getElementById('morphDesc');
+  if(ms<=2) desc.textContent='instant — hard cut between states';
+  else if(ms<20) desc.textContent='razor sharp — abrupt character shifts';
+  else if(ms<80) desc.textContent='filter & wave morph — pitch stays true';
+  else if(ms<300) desc.textContent='slow morphs — sounds bleed together';
+  else if(ms<900) desc.textContent='glacial — continuous tonal transformation';
+  else desc.textContent='tectonic — whole phrases dissolve into each other';
+});
+
+document.getElementById('hiVolSlider').addEventListener('input',function(){
+  const db=parseInt(this.value);
+  hiVolDb=db;
+  document.getElementById('hiVolVal').textContent=db+'dB';
+  if(hiShelfFilter) hiShelfFilter.gain.setTargetAtTime(db,audioCtx.currentTime,0.05);
+});
+
+document.getElementById('driveSlider').addEventListener('input',function(){
+  const val=parseFloat(this.value);
+  driveAmount=val;
+  document.getElementById('driveVal').textContent=val.toFixed(2);
+  if(waveshaper) waveshaper.curve=makeDistCurve(val*180);
+});
+
+// Build initial pattern
+buildPattern(currentProbMap);
+commitPattern(buildPattern(currentProbMap));
+renderSlots();
+updateSlotStatus();
+// Randomize scale select on every page load
+(function() {
+  const sel = document.getElementById('scaleSelect');
+  if (!sel) return;
+  const opts = sel.querySelectorAll('option');
+  const pick = Math.floor(Math.random() * opts.length);
+  opts.forEach(o => o.removeAttribute('selected'));
+  opts[pick].selected = true;
+})();
+
+</script>
+</body>
+</html>
