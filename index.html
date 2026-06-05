@@ -420,18 +420,57 @@
     flex-direction: column;
     gap: 8px;
   }
+  .controls-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+  }
+  .drift-btn {
+    width: 70px;
+    flex-shrink: 0;
+    padding: 0;
+    height: 46px;
+    background: linear-gradient(180deg, #0a1a2a 0%, #051020 100%);
+    border: 1px solid #005580;
+    color: #00aadd;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 14px;
+    letter-spacing: 3px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    text-shadow: 0 0 8px rgba(0,170,220,0.6);
+    box-shadow: 0 0 8px rgba(0,100,180,0.15);
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .drift-btn.active {
+    background: linear-gradient(180deg, #0a2a40 0%, #051828 100%);
+    border-color: #00ccff;
+    color: #00ccff;
+    box-shadow: 0 0 18px rgba(0,200,255,0.4), inset 0 0 20px rgba(0,150,255,0.08);
+    text-shadow: 0 0 12px rgba(0,200,255,0.9);
+    animation: driftPulse 2s ease-in-out infinite alternate;
+  }
+  @keyframes driftPulse {
+    from { box-shadow: 0 0 12px rgba(0,200,255,0.3), inset 0 0 15px rgba(0,150,255,0.06); }
+    to   { box-shadow: 0 0 28px rgba(0,200,255,0.6), inset 0 0 30px rgba(0,150,255,0.14); }
+  }
 
   /* Big play button */
   .play-btn {
-    width: 100%;
+    width: 80px;
+    flex-shrink: 0;
     padding: 0;
-    height: 50px;
+    height: 46px;
     background: transparent;
     border: 1px solid var(--accent);
     color: var(--accent);
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 22px;
-    letter-spacing: 10px;
+    font-size: 14px;
+    letter-spacing: 3px;
     border-radius: 3px;
     cursor: pointer;
     transition: all 0.15s;
@@ -517,14 +556,15 @@
 
   .recall-slots {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 5px;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 6px;
   }
 
   .slot-btn {
-    aspect-ratio: 1;
+    height: 36px;
     border: 1px solid var(--border);
-    border-radius: 2px;
+    border-radius: 3px;
     background: var(--tape);
     cursor: pointer;
     position: relative;
@@ -578,9 +618,10 @@
     position: relative;
     z-index: 1;
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 11px;
+    font-size: 15px;
     color: var(--text-dim);
     line-height: 1;
+    letter-spacing: 1px;
   }
 
   .slot-btn.filled .slot-num,
@@ -727,8 +768,11 @@
 
   <!-- Controls -->
   <div class="controls">
-    <button class="play-btn" id="playBtn"><span>PLAY</span></button>
-    <button class="rand-btn" id="randBtn">RANDOMIZE PROBABILITIES</button>
+    <div class="controls-row">
+      <button class="play-btn" id="playBtn"><span>PLAY</span></button>
+      <button class="rand-btn" id="randBtn">RANDOMIZE</button>
+      <button class="drift-btn" id="driftBtn">DRIFT</button>
+    </div>
   </div>
 </div>
 
@@ -978,10 +1022,14 @@ let currentStep = 0;
 let schedulerId = null;
 let nextStepTime = 0;
 
-let masterGain, hiShelfFilter, compressor, waveshaper, analyserNode, filterNode, noiseGainNode, noiseBufferSrc;
+let masterGain, driftMasterGain, hiShelfFilter, compressor, waveshaper, analyserNode, filterNode, noiseGainNode, noiseBufferSrc;
+let driftFilter, driftShaper, driftHiShelf;
 let filterFreqNow = 800;
 let filterQNow = 2;
 let noiseNow = 0;
+let lastFiredRoleId = null;   // most recent role that fired
+let lastFiredMidi   = null;   // most recent midi note that fired
+let lastFiredWave   = 'sine'; // most recent oscillator type
 
 // ============================================================
 // AUDIO INIT
@@ -994,6 +1042,30 @@ function initAudio(bpm, scaleName) {
   masterGain = audioCtx.createGain();
   masterGain.gain.value = 0.82;
   masterGain.connect(audioCtx.destination);
+
+  // Separate gain for drift — always connected to destination, not through masterGain
+  driftMasterGain = audioCtx.createGain();
+  driftMasterGain.gain.value = 0;
+  driftMasterGain.connect(audioCtx.destination);
+
+  // Drift has its own filter + waveshaper so modulation works independently
+  driftFilter = audioCtx.createBiquadFilter();
+  driftFilter.type = 'lowpass';
+  driftFilter.frequency.value = 800;
+  driftFilter.Q.value = 2;
+
+  driftShaper = audioCtx.createWaveShaper();
+  driftShaper.curve = makeDistCurve(driveAmount * 180);
+  driftShaper.oversample = '4x';
+
+  driftHiShelf = audioCtx.createBiquadFilter();
+  driftHiShelf.type = 'highshelf';
+  driftHiShelf.frequency.value = 3000;
+  driftHiShelf.gain.value = -10; // tame high freq harshness on drift
+
+  driftFilter.connect(driftShaper);
+  driftShaper.connect(driftHiShelf);
+  driftHiShelf.connect(driftMasterGain);
 
   hiShelfFilter = audioCtx.createBiquadFilter();
   hiShelfFilter.type = 'highshelf';
@@ -1148,6 +1220,11 @@ function fireNote(roleId, midiNote, startTime) {
   env.connect(filterNode);
   osc.start(t);
   osc.stop(noteEnd + 0.05);
+
+  // Track live state for drift inheritance
+  lastFiredRoleId = roleId;
+  lastFiredMidi   = midiNote;
+  lastFiredWave   = role.wave;
 
   // DOM
   const domDelay = Math.max(0, (t - audioCtx.currentTime) * 1000);
@@ -1333,7 +1410,13 @@ let activeSlotIdx = -1; // currently playing slot (-1 = live)
 let queuedSlotIdx = -1; // queued for next bar
 
 function saveToNextSlot() {
-  // Save the CURRENT (outgoing) pattern before randomize takes over
+  // If we're already playing a saved slot, don't re-save it
+  if (activeSlotIdx >= 0 && recallSlots[activeSlotIdx]) {
+    const existing = recallSlots[activeSlotIdx];
+    const samePattern = existing.pattern.join(',') === lockedPattern.join(',');
+    if (samePattern) return; // identical — skip
+  }
+
   const slot = {
     pattern: [...lockedPattern],
     midi:    [...lockedMidi],
@@ -1413,6 +1496,315 @@ function updateSlotStatus() {
 }
 
 
+
+// ============================================================
+// DRIFT ENGINE
+// Hold DRIFT to suspend the sequencer and let the filter/osc
+// slowly wander in tempo-synced LFO patterns until released.
+// ============================================================
+let driftActive = false;
+let driftOsc = null;
+let driftEnv = null;
+let driftMorphOsc = null;  // module-scoped so stopDrift can access
+let driftLFO = null;
+let driftFilterLFO = null;
+let driftQLFO = null;
+let driftRafId = null;
+let driftPhase = 0;
+let stopDriftNoiseFn = null; // module-scoped noise stopper
+
+function startDrift() {
+  if (!audioCtx || driftActive) return;
+  driftActive = true;
+
+  const btn = document.getElementById('driftBtn');
+  if (btn) btn.classList.add('active');
+
+  // Mute loop, bring in drift on its own output
+  const dNow = audioCtx.currentTime;
+  masterGain.gain.cancelScheduledValues(dNow);
+  masterGain.gain.setValueAtTime(masterGain.gain.value, dNow);
+  masterGain.gain.linearRampToValueAtTime(0, dNow + 0.06);
+  driftMasterGain.gain.cancelScheduledValues(dNow);
+  driftMasterGain.gain.setValueAtTime(0, dNow);
+  driftMasterGain.gain.linearRampToValueAtTime(0.38, dNow + 0.08);
+
+  const t = audioCtx.currentTime;
+  const stepSec = (60 / currentBPM) / 4;
+  const barSec = stepSec * 16;
+
+  // === Inherit exact current synth state ===
+  // Wave: whatever just fired
+  const driftWave = lastFiredWave || 'sine';
+
+  // Frequency: last midi note that fired, exact pitch
+  const baseFreq = lastFiredMidi ? midiToFreq(lastFiredMidi) : midiToFreq(48);
+
+  // Filter: start exactly where filter currently is, then drift FROM there
+  const startFilterFreq = filterFreqNow;
+  const startFilterQ    = filterQNow;
+
+  // Noise: inherit current noise level
+  const startNoise = noiseGainNode.gain.value;
+
+  // Spawn oscillator with same wave type and pitch — sounds like the note is held
+  driftOsc = audioCtx.createOscillator();
+  driftOsc.type = driftWave;
+  driftOsc.frequency.setValueAtTime(baseFreq, t);
+
+  // Amp: crossfade in quickly (sounds like the note just sustained)
+  driftEnv = audioCtx.createGain();
+  driftEnv.gain.setValueAtTime(0, t);
+  driftEnv.gain.linearRampToValueAtTime(0.35, t + 0.06);
+
+  // Drift noise — own source so it doesn't interfere with loop noise
+  const driftNoiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+  const dnd = driftNoiseBuf.getChannelData(0);
+  for (let i = 0; i < dnd.length; i++) dnd[i] = Math.random() * 2 - 1;
+  const driftNoiseSrc = audioCtx.createBufferSource();
+  driftNoiseSrc.buffer = driftNoiseBuf;
+  driftNoiseSrc.loop = true;
+  const driftNoiseGain = audioCtx.createGain();
+  driftNoiseGain.gain.setValueAtTime(startNoise, t);
+  driftNoiseSrc.connect(driftNoiseGain);
+  driftNoiseGain.connect(driftFilter);
+  driftNoiseSrc.start();
+
+  // Stop drift noise on release
+  stopDriftNoiseFn = () => {
+    try { driftNoiseSrc.stop(); } catch(e) {}
+  };
+
+  // Drift: osc → env → driftFilter → driftShaper → driftMasterGain
+  driftOsc.connect(driftEnv);
+  driftEnv.connect(driftFilter);
+  driftOsc.start(t);
+
+  // Seed driftFilter with current filter state so it starts from the right place
+  driftFilter.frequency.setValueAtTime(startFilterFreq, t);
+  driftFilter.Q.setValueAtTime(startFilterQ, t);
+
+  // LFO ranges orbit around the inherited filter position
+  // — drift stays in the character of the sound that triggered it
+  const filterCenter = Math.max(120, Math.min(4000, startFilterFreq));
+  const filterDepth  = filterCenter * 0.7; // ±70% of current position
+  const filterLow    = Math.max(80,   filterCenter - filterDepth);
+  const filterHigh   = Math.min(8000, filterCenter + filterDepth);
+  const qCenter      = Math.max(0.5, startFilterQ);
+
+  // Noise drift orbits current noise level
+  const noiseLow  = Math.max(0, startNoise - 0.05);
+  const noiseHigh = Math.min(0.5, startNoise + 0.25);
+
+  // Wave sequence — drift cycles through these
+  const waveSequence = ['sine', 'triangle', 'sawtooth', 'square', 'triangle', 'sawtooth', 'sine'];
+  let waveIdx = Math.max(0, waveSequence.indexOf(driftWave));
+  driftMorphOsc = null;
+  let isMorphing = false;
+  let lastWaveMorphTime = t; // first morph after waveMorphInterval, not immediately
+  let waveMorphInterval = barSec * 1.2;
+  const waveMorphDuration = barSec * 2.5;
+
+  // Filter sweep roams the full spectrum but STARTS at the inherited position
+  const filterFloor = 60;
+  const filterCeil  = 9000;
+
+  // Calculate LFO phase offset so combo=startCombo at elapsed=0
+  // sweepFreq = filterFloor * (filterCeil/filterFloor)^expCombo
+  // Solve for startCombo given startFilterFreq
+  const startCombo = Math.pow(
+    Math.log(Math.max(filterFloor, startFilterFreq) / filterFloor) /
+    Math.log(filterCeil / filterFloor),
+    2  // inverse of pow(combo, 0.5)
+  );
+  // Use startCombo to back-calculate a phase offset for lfo1 (dominant LFO)
+  // combo = (lfo1*0.5 + lfo2*0.35 + lfo3*0.15 + 1) / 2
+  // At t=0, lfo2 and lfo3 have phase offsets 1.2 and 2.5 so they're non-zero
+  // We offset lfo1 phase so the sum lands on startCombo
+  const lfo2at0 = Math.sin(1.2) * 0.35;
+  const lfo3at0 = Math.sin(2.5) * 0.15;
+  const lfo1needed = (startCombo * 2 - 1 - lfo2at0 - lfo3at0) / 0.5;
+  const lfo1Phase = Math.asin(Math.max(-1, Math.min(1, lfo1needed)));
+
+  function spawnMorphOsc(waveType) {
+    const o = audioCtx.createOscillator();
+    o.type = waveType;
+    const currentFreq = driftOsc ? driftOsc.frequency.value : baseFreq;
+    o.frequency.setValueAtTime(currentFreq, audioCtx.currentTime);
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.001, audioCtx.currentTime);
+    o.connect(g);
+    g.connect(driftFilter);
+    o.start();
+    return { osc: o, env: g };
+  }
+
+  // Random LFO targets — re-rolled periodically for unpredictability
+  // Each parameter wanders independently toward a random target
+  let rTargets = {
+    filterFreq:  startFilterFreq,
+    filterQ:     startFilterQ,
+    pitch:       0,        // cents offset
+    noise:       startNoise,
+    volume:      0.35,
+    detune:      0,        // extra osc detune for beating/chorus
+  };
+  let rCurrent = { ...rTargets };
+  let rRollTimes = {};     // when each param next picks a new target
+  const rIntervals = {     // how often each param picks new target (in seconds)
+    filterFreq:  () => barSec * (0.4 + Math.random() * 1.8),
+    filterQ:     () => barSec * (0.3 + Math.random() * 1.2),
+    pitch:       () => barSec * (3.0 + Math.random() * 4.0),   // slow
+    noise:       () => barSec * (0.6 + Math.random() * 1.5),
+    volume:      () => barSec * (0.8 + Math.random() * 2.0),
+    detune:      () => barSec * (1.0 + Math.random() * 2.5),
+  };
+  const rRanges = {        // target ranges per param
+    filterFreq:  () => 60 + Math.random() * 8940,    // full spectrum
+    filterQ:     () => 0.5 + Math.random() * 20,
+    pitch:       () => (Math.random() - 0.5) * 80,   // ±40 cents max
+    noise:       () => Math.random() * 0.45,
+    volume:      () => 0.15 + Math.random() * 0.35,
+    detune:      () => (Math.random() - 0.5) * 24,   // ±12 cents detune
+  };
+  const rSpeeds = {        // lerp speed (lower = slower/smoother)
+    filterFreq:  0.04,
+    filterQ:     0.06,
+    pitch:       0.008,
+    noise:       0.03,
+    volume:      0.02,
+    detune:      0.015,
+  };
+
+  // Init roll times so everything starts moving immediately
+  for (const k in rIntervals) rRollTimes[k] = t;
+
+  function animateDrift() {
+    if (!driftActive) return;
+    driftRafId = requestAnimationFrame(animateDrift);
+
+    const now = audioCtx.currentTime;
+    const elapsed = now - t;
+
+    // === Roll new random targets when interval expires ===
+    for (const k in rIntervals) {
+      if (now >= rRollTimes[k]) {
+        rTargets[k] = rRanges[k]();
+        rRollTimes[k] = now + rIntervals[k]();
+      }
+      // Smooth lerp toward target
+      rCurrent[k] += (rTargets[k] - rCurrent[k]) * rSpeeds[k];
+    }
+
+    // === Pitch drift ===
+    const driftFreq = baseFreq * Math.pow(2, rCurrent.pitch / 1200);
+    if (driftOsc)      driftOsc.frequency.setTargetAtTime(driftFreq, now, 0.2);
+    if (driftMorphOsc) driftMorphOsc.osc.frequency.setTargetAtTime(driftFreq, now, 0.2);
+
+    // === Detune — creates chorus/beating between drift and morphOsc ===
+    if (driftOsc)      driftOsc.detune.setTargetAtTime(rCurrent.detune, now, 0.1);
+    if (driftMorphOsc) driftMorphOsc.osc.detune.setTargetAtTime(-rCurrent.detune, now, 0.1); // opposite
+
+    // === Filter ===
+    // Blend LFO phase with random target for continuous + spontaneous movement
+    const lfo1 = Math.sin((elapsed / (barSec * 1.0)) * Math.PI * 2 + lfo1Phase);
+    const lfoBlend = (lfo1 + 1) / 2;  // 0..1
+    const blendedFreq = rCurrent.filterFreq * 0.7 + (filterFloor + lfoBlend * (9000 - filterFloor)) * 0.3;
+    driftFilter.frequency.setTargetAtTime(Math.max(60, blendedFreq), now, 0.06);
+    driftFilter.Q.setTargetAtTime(Math.max(0.4, rCurrent.filterQ), now, 0.06);
+
+    // === Noise ===
+    driftNoiseGain.gain.setTargetAtTime(Math.min(0.5, rCurrent.noise), now, 0.1);
+
+    // === Volume — only breathe when not mid-morph crossfade ===
+    if (driftEnv && !isMorphing) driftEnv.gain.setTargetAtTime(rCurrent.volume, now, 0.08);
+
+    // === Wave morph: random interval, random next wave ===
+    const timeSinceLastMorph = now - lastWaveMorphTime;
+    if (!isMorphing && timeSinceLastMorph >= waveMorphInterval) {
+      isMorphing = true;
+      // Step through sequence in order — hear the evolution sine→tri→saw→square→...
+      // Occasionally skip forward or reverse for surprise
+      const step = Math.random() < 0.15 ? -1 : 1;
+      waveIdx = (waveIdx + step + waveSequence.length) % waveSequence.length;
+
+      driftMorphOsc = spawnMorphOsc(waveSequence[waveIdx]);
+      // Slow crossfade — sine bleeds into triangle bleeds into saw
+      // Both oscillators audible through most of the transition
+      const morphVol = Math.max(0.2, rCurrent.volume);
+      driftMorphOsc.env.gain.cancelScheduledValues(now);
+      driftMorphOsc.env.gain.setValueAtTime(0.001, now);
+      driftMorphOsc.env.gain.linearRampToValueAtTime(morphVol, now + waveMorphDuration * 0.8);
+      driftEnv.gain.cancelScheduledValues(now);
+      driftEnv.gain.setValueAtTime(driftEnv.gain.value, now);
+      driftEnv.gain.linearRampToValueAtTime(0.001, now + waveMorphDuration);
+
+      // Randomize next morph interval too
+      waveMorphInterval = barSec * (0.8 + Math.random() * 2.0);
+    }
+
+    if (isMorphing && driftMorphOsc) {
+      const morphElapsed = now - (lastWaveMorphTime + waveMorphInterval);
+      if (morphElapsed >= waveMorphDuration) {
+        try { driftOsc.stop(); } catch(e) {}
+        driftOsc      = driftMorphOsc.osc;
+        driftEnv      = driftMorphOsc.env;
+        driftMorphOsc = null;
+        isMorphing    = false;
+        lastWaveMorphTime = now;
+        waveMorphInterval = barSec * (1.5 + Math.random() * 2.5);
+      }
+    }
+  }
+
+  animateDrift();
+}
+
+function stopDrift() {
+  if (!driftActive) return;
+  driftActive = false;
+
+  const btn = document.getElementById('driftBtn');
+  if (btn) btn.classList.remove('active');
+
+  if (driftRafId) { cancelAnimationFrame(driftRafId); driftRafId = null; }
+
+  if (driftOsc && driftEnv) {
+    const st = audioCtx.currentTime;
+
+    // Re-route drift osc through the main filter so the next sequencer note
+    // morphs grab and transform it — sounds like the drift is "caught" by the beat
+    try {
+      driftEnv.disconnect();
+      driftEnv.connect(filterNode); // now subject to main filter morphs
+    } catch(e) {}
+
+    // Also kill morphOsc if mid-crossfade
+    if (driftMorphOsc) {
+      try { driftMorphOsc.env.gain.setTargetAtTime(0, st, 0.05); driftMorphOsc.osc.stop(st + 0.2); } catch(e) {}
+      driftMorphOsc = null;
+    }
+
+    // Let the drift osc ring briefly then stop — the next note's filter will shape its exit
+    driftEnv.gain.cancelScheduledValues(st);
+    driftEnv.gain.setValueAtTime(driftEnv.gain.value, st);
+    driftEnv.gain.setTargetAtTime(0, st + 0.05, 0.18); // slow fade, filter morph shapes it
+    try { driftOsc.stop(st + 0.8); } catch(e) {}
+    driftOsc = null;
+    driftEnv = null;
+    if (stopDriftNoiseFn) { try { stopDriftNoiseFn(); } catch(e) {} stopDriftNoiseFn = null; }
+  }
+
+  // Fade loop back in, fade drift out
+  const rNow = audioCtx.currentTime;
+  masterGain.gain.cancelScheduledValues(rNow);
+  masterGain.gain.setValueAtTime(masterGain.gain.value, rNow);
+  masterGain.gain.linearRampToValueAtTime(0.82, rNow + 0.08);
+  driftMasterGain.gain.cancelScheduledValues(rNow);
+  driftMasterGain.gain.setValueAtTime(driftMasterGain.gain.value, rNow);
+  driftMasterGain.gain.linearRampToValueAtTime(0, rNow + 0.25);
+}
+
 // ============================================================
 // CONTROLS
 // ============================================================
@@ -1445,6 +1837,15 @@ document.getElementById('playBtn').addEventListener('click',function(){
     stopSequencer();
   }
 });
+
+// Drift button — hold to drift, release to resume
+const driftBtn = document.getElementById('driftBtn');
+driftBtn.addEventListener('mousedown',  () => { if(audioCtx) startDrift(); });
+driftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(audioCtx) startDrift(); }, { passive: false });
+driftBtn.addEventListener('mouseup',    stopDrift);
+driftBtn.addEventListener('mouseleave', stopDrift);
+driftBtn.addEventListener('touchend',   stopDrift);
+driftBtn.addEventListener('touchcancel',stopDrift);
 
 document.getElementById('randBtn').addEventListener('click',function(){
   saveToNextSlot();    // save outgoing loop before it changes
