@@ -9,27 +9,27 @@
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Bebas+Neue&display=swap');
 
   :root {
-    --bg: #070710;
-    --surface: #0d0d1a;
-    --panel: #10101f;
-    --border: #22224a;
-    --accent: #c832ff;
-    --accent2: #7a1a99;
-    --dim: #3a2a55;
-    --text: #e0c0ff;
-    --text-dim: #5a4070;
-    --glow: rgba(200,50,255,0.15);
-    --red: #ff3366;
-    --green: #00ffaa;
-    --tape: #0a0a18;
+    --bg:        #010c08;
+    --surface:   #021410;
+    --panel:     #031a14;
+    --border:    #0a3d2a;
+    --accent:    #00ff9d;
+    --accent2:   #00994d;
+    --dim:       #0a3020;
+    --text:      #b0ffe0;
+    --text-dim:  #2a6645;
+    --glow:      rgba(0,255,157,0.12);
+    --red:       #ff4433;
+    --green:     #00ff9d;
+    --tape:      #010e0a;
 
-    /* Role colors */
-    --kick-color:   #ff2244;
-    --bass-color:   #ff8800;
-    --snare-color:  #ffee00;
-    --hihat-color:  #00ffaa;
-    --melody-color: #00ccff;
-    --stab-color:   #cc44ff;
+    /* Role colors — green phosphor family */
+    --kick-color:   #00ff9d;
+    --bass-color:   #00cc6a;
+    --snare-color:  #80ffd0;
+    --hihat-color:  #33ffaa;
+    --melody-color: #00ff6a;
+    --stab-color:   #b3ffe0;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -50,22 +50,22 @@
   /* === INIT SCREEN === */
   #init {
     align-items: center; justify-content: center;
-    background: radial-gradient(ellipse at 50% 60%, #1a1208 0%, var(--bg) 70%);
+    background: radial-gradient(ellipse at 50% 55%, #031f14 0%, var(--bg) 75%);
     gap: 0;
     padding: 32px 24px;
   }
 
   .logo-block {
     text-align: center;
-    margin-bottom: 32px;
+    margin-bottom: 20px;
   }
 
   .logo-main {
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 52px;
+    font-size: 44px;
     letter-spacing: 6px;
     color: var(--accent);
-    text-shadow: 0 0 40px rgba(200,50,255,0.5), 0 0 80px rgba(100,50,255,0.25);
+    text-shadow: 0 0 30px rgba(0,255,157,0.7), 0 0 80px rgba(0,255,157,0.2), 0 0 2px #fff;
     line-height: 1;
   }
 
@@ -108,7 +108,7 @@
     color: var(--accent);
     text-align: center;
     letter-spacing: 4px;
-    text-shadow: 0 0 20px rgba(200,150,42,0.3);
+    text-shadow: 0 0 20px rgba(0,255,157,0.5), 0 0 2px #fff;
   }
 
   .bpm-unit {
@@ -122,7 +122,7 @@
   input[type=range] {
     width: 100%;
     -webkit-appearance: none;
-    height: 3px;
+    height: 4px;
     background: var(--border);
     border-radius: 2px;
     outline: none;
@@ -130,11 +130,14 @@
   }
   input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    width: 20px; height: 20px;
-    border-radius: 50%;
-    background: conic-gradient(#ff2244, #ff8800, #ffee00, #00ffaa, #00ccff, #cc44ff, #ff2244);
-    box-shadow: 0 0 10px rgba(200,50,255,0.6);
+    width: 28px; height: 28px;
+    border-radius: 3px;
+    background: linear-gradient(180deg, #1a4a30 0%, #0a2a1a 50%, #1a4a30 100%);
+    border: 1px solid #00ff9d;
+    box-shadow: 0 0 8px rgba(0,255,157,0.5), inset 0 1px 0 rgba(0,255,157,0.3);
     cursor: pointer;
+    margin-top: -12px;
+    position: relative;
   }
 
   select {
@@ -189,7 +192,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px 10px;
+    padding: 8px 16px 6px;
     border-bottom: 1px solid var(--border);
     background: var(--surface);
   }
@@ -216,7 +219,7 @@
     border-radius: 2px;
   }
 
-  .pill.active { color: var(--accent); border-color: var(--accent2); }
+  .pill.active { color: var(--accent); border-color: var(--accent2); text-shadow: 0 0 8px var(--accent); }
 
   /* VU meter strip */
   .vu-strip {
@@ -226,7 +229,7 @@
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     align-items: flex-end;
-    height: 36px;
+    height: 24px;
     overflow: hidden;
     flex-shrink: 0;
   }
@@ -244,11 +247,11 @@
 
   /* Waveform display */
   .waveform-area {
-    padding: 8px 20px 6px;
+    padding: 5px 16px 4px;
     background: var(--tape);
     border-bottom: 1px solid var(--border);
     position: relative;
-    height: 82px;
+    height: 58px;
     flex-shrink: 0;
     overflow: hidden;
   }
@@ -263,7 +266,7 @@
 
   canvas#waveCanvas {
     width: 100%;
-    height: 60px;
+    height: 42px;
     display: block;
     opacity: 0.85;
     flex-shrink: 0;
@@ -271,13 +274,13 @@
 
   /* State display */
   .state-display {
-    padding: 8px 20px;
+    padding: 6px 16px;
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
+    gap: 6px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
-    height: 64px;
+    height: 52px;
     flex-shrink: 0;
     overflow: hidden;
   }
@@ -324,7 +327,7 @@
 
   /* Morph slider area */
   .morph-section {
-    padding: 14px 20px;
+    padding: 7px 16px;
     border-bottom: 1px solid var(--border);
   }
 
@@ -332,7 +335,7 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 12px;
+    margin-bottom: 6px;
   }
 
   .section-label {
@@ -353,14 +356,14 @@
     font-size: 8px;
     letter-spacing: 2px;
     color: var(--text-dim);
-    margin-top: 8px;
+    margin-top: 4px;
     text-align: center;
     font-style: italic;
   }
 
   /* Volume section */
   .vol-section {
-    padding: 12px 20px;
+    padding: 6px 16px;
     border-bottom: 1px solid var(--border);
     display: flex;
     gap: 14px;
@@ -381,12 +384,12 @@
 
   /* Beat grid */
   .beat-grid {
-    padding: 8px 20px;
+    padding: 5px 16px;
     display: grid;
     grid-template-columns: repeat(16, 1fr);
     gap: 3px;
     border-bottom: 1px solid var(--border);
-    height: 36px;
+    height: 28px;
     flex-shrink: 0;
     overflow: hidden;
     align-content: center;
@@ -412,24 +415,22 @@
 
   /* Main controls */
   .controls {
-    flex: 1;
-    padding: 16px 20px;
+    padding: 8px 16px 10px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-    justify-content: flex-end;
+    gap: 8px;
   }
 
   /* Big play button */
   .play-btn {
     width: 100%;
     padding: 0;
-    height: 64px;
+    height: 50px;
     background: transparent;
     border: 1px solid var(--accent);
     color: var(--accent);
     font-family: 'Bebas Neue', sans-serif;
-    font-size: 28px;
+    font-size: 22px;
     letter-spacing: 10px;
     border-radius: 3px;
     cursor: pointer;
@@ -442,14 +443,14 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(90deg, #ff2244, #ff8800, #ffee00, #00ffaa, #00ccff, #cc44ff);
+    background: linear-gradient(90deg, #003d1f, #00ff9d, #00cc7a, #00ff9d, #003d1f);
     background-size: 200% 100%;
     transform: scaleX(0);
     transform-origin: left;
     transition: transform 0.15s;
-    animation: rainbowShift 3s linear infinite;
+    animation: greenShift 3s ease-in-out infinite alternate;
   }
-  @keyframes rainbowShift {
+  @keyframes greenShift {
     0%   { background-position: 0% 50%; }
     100% { background-position: 200% 50%; }
   }
@@ -460,7 +461,7 @@
   /* Randomize button */
   .rand-btn {
     width: 100%;
-    padding: 16px;
+    padding: 10px;
     background: var(--panel);
     border: 1px solid var(--border);
     color: var(--text-dim);
@@ -483,9 +484,10 @@
     position: fixed;
     inset: 0;
     pointer-events: none;
-    background: 
-      radial-gradient(ellipse at 50% 0%, rgba(200,50,255,0.04) 0%, transparent 70%),
-      repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px);
+    background:
+      radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%),
+      radial-gradient(ellipse at 50% 20%, rgba(0,255,157,0.04) 0%, transparent 60%),
+      repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 3px);
     z-index: 100;
   }
 
@@ -500,7 +502,7 @@
 
   /* === LOOP RECALL SLOTS === */
   .recall-section {
-    padding: 10px 20px 12px;
+    padding: 6px 16px 8px;
     border-bottom: 1px solid var(--border);
     flex-shrink: 0;
     overflow: visible;
@@ -510,7 +512,7 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
-    margin-bottom: 8px;
+    margin-bottom: 5px;
   }
 
   .recall-slots {
@@ -553,13 +555,9 @@
   }
 
   .slot-btn.active::after {
-    background: conic-gradient(#ff2244, #ff8800, #ffee00, #00ffaa, #00ccff, #cc44ff, #ff2244);
+    background: var(--accent);
     opacity: 0.9;
-    animation: slotPulse 0.5s ease-in-out infinite alternate, slotSpin 3s linear infinite;
-  }
-  @keyframes slotSpin {
-    from { transform: rotate(0deg) scale(1.5); }
-    to   { transform: rotate(360deg) scale(1.5); }
+    animation: slotPulse 0.4s ease-in-out infinite alternate;
   }
 
   .slot-btn.queued {
@@ -729,8 +727,8 @@
 
   <!-- Controls -->
   <div class="controls">
-    <button class="play-btn" id="playBtn"><span>▶  PLAY</span></button>
-    <button class="rand-btn" id="randBtn">⟳ RANDOMIZE PROBABILITIES</button>
+    <button class="play-btn" id="playBtn"><span>PLAY</span></button>
+    <button class="rand-btn" id="randBtn">RANDOMIZE PROBABILITIES</button>
   </div>
 </div>
 
@@ -778,12 +776,12 @@ const ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
 // Role colors for display
 const ROLE_COLORS = {
-  kick:   '#ff2244',
-  bass:   '#ff8800',
-  snare:  '#ffee00',
-  hihat:  '#00ffaa',
-  melody: '#00ccff',
-  stab:   '#cc44ff',
+  kick:   '#00ff9d',
+  bass:   '#00cc6a',
+  snare:  '#80ffd0',
+  hihat:  '#33ffaa',
+  melody: '#00ff6a',
+  stab:   '#b3ffe0',
 };
 
 // ============================================================
@@ -1155,7 +1153,7 @@ function fireNote(roleId, midiNote, startTime) {
   const domDelay = Math.max(0, (t - audioCtx.currentTime) * 1000);
   setTimeout(() => {
     const wmap={sine:'SINE',sawtooth:'SAW',square:'SQR',triangle:'TRI'};
-    const fmap={kick:'LP↓',bass:'LP',snare:'BP↑',hihat:'HP',melody:'LP↑',stab:'BP'};
+    const fmap={kick:'LP-',bass:'LP',snare:'BP+',hihat:'HP',melody:'LP+',stab:'BP'};
     const vw=document.getElementById('valWave');
     const vf=document.getElementById('valFilter');
     const vr=document.getElementById('valRole');
@@ -1274,14 +1272,15 @@ function startWaveformLoop() {
       ctx2.beginPath(); ctx2.moveTo(0,H/2); ctx2.lineTo(W,H/2); ctx2.stroke(); return;
     }
     analyserNode.getFloatTimeDomainData(buf);
-    const hue = (Date.now() / 30) % 360;
+    // Phosphor green — intensity pulses with amplitude
     const grad = ctx2.createLinearGradient(0,0,W,0);
-    grad.addColorStop(0,   `hsl(${hue},100%,60%)`);
-    grad.addColorStop(0.33,`hsl(${(hue+90)%360},100%,60%)`);
-    grad.addColorStop(0.66,`hsl(${(hue+180)%360},100%,60%)`);
-    grad.addColorStop(1,   `hsl(${(hue+270)%360},100%,60%)`);
+    grad.addColorStop(0,   '#004d28');
+    grad.addColorStop(0.2, '#00ff9d');
+    grad.addColorStop(0.5, '#00ffb3');
+    grad.addColorStop(0.8, '#00ff9d');
+    grad.addColorStop(1,   '#004d28');
     ctx2.strokeStyle=grad; ctx2.lineWidth=1.5;
-    ctx2.shadowColor=`hsl(${hue},100%,60%)`; ctx2.shadowBlur=6;
+    ctx2.shadowColor='#00ff9d'; ctx2.shadowBlur=8;
     ctx2.beginPath();
     for(let i=0;i<buf.length;i++){
       const x=(i/buf.length)*W, y=((buf[i]+1)/2)*H;
@@ -1315,8 +1314,10 @@ function startVU() {
       for(let j=i*chunk;j<(i+1)*chunk;j++) s+=Math.abs(buf[j]||0);
       const v=Math.min(1,(s/chunk)*2.5);
       bar.style.transform='scaleY('+Math.max(0.07,v)+')';
-      const bHue = (i / bars.length) * 300;
-      bar.style.background = v > 0.07 ? `hsl(${bHue},100%,${40+v*30}%)` : 'var(--border)';
+      // Green spectrum — dark to bright phosphor
+      const vuColors = ['#004d20','#006b2a','#009940','#00cc55','#00ff6a','#00ff9d','#33ffb0','#80ffd0'];
+      const ci = Math.floor((i / bars.length) * vuColors.length);
+      bar.style.background = v > 0.07 ? vuColors[Math.min(ci, vuColors.length-1)] : 'var(--border)';
     });
   }
   anim();
@@ -1436,11 +1437,11 @@ document.getElementById('playBtn').addEventListener('click',function(){
   const btn=document.getElementById('playBtn');
   if(isPlaying){
     btn.classList.add('playing');
-    btn.querySelector('span').textContent='■  STOP';
+    btn.querySelector('span').textContent='STOP';
     startSequencer();
   } else {
     btn.classList.remove('playing');
-    btn.querySelector('span').textContent='▶  PLAY';
+    btn.querySelector('span').textContent='PLAY';
     stopSequencer();
   }
 });
