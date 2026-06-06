@@ -384,23 +384,42 @@
 
   /* Beat grid */
   .beat-grid {
-    padding: 5px 16px;
+    padding: 4px 16px;
     display: grid;
     grid-template-columns: repeat(16, 1fr);
     gap: 3px;
     border-bottom: 1px solid var(--border);
-    height: 28px;
+    height: 38px;
     flex-shrink: 0;
     overflow: hidden;
     align-content: center;
   }
 
   .beat-dot {
-    aspect-ratio: 1;
+    height: 30px;
     border-radius: 1px;
     background: var(--border);
     transition: background 0.05s, box-shadow 0.05s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 2px;
+    position: relative;
+    cursor: pointer;
   }
+
+  .beat-dot-num {
+    font-family: 'Space Mono', monospace;
+    font-size: 6px;
+    color: var(--text-dim);
+    line-height: 1;
+    opacity: 0.6;
+    user-select: none;
+  }
+
+  .beat-dot.active .beat-dot-num  { opacity: 0.9; color: var(--bg); }
+  .beat-dot.current .beat-dot-num { opacity: 1;   color: var(--bg); font-weight: bold; }
 
   .beat-dot.active {
     background: var(--dot-color, var(--accent2));
@@ -627,6 +646,90 @@
   .slot-btn.filled .slot-num,
   .slot-btn.active .slot-num { color: var(--bg); }
 
+
+  /* === VOICE MODE TOGGLE === */
+  .mode-toggle {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  .mode-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--text-dim);
+    transition: color 0.2s;
+    white-space: nowrap;
+  }
+
+  .mode-label.active {
+    color: var(--accent);
+    text-shadow: 0 0 8px rgba(0,255,157,0.6);
+  }
+
+  .toggle-track {
+    position: relative;
+    width: 44px;
+    height: 24px;
+    background: var(--tape);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: border-color 0.2s;
+  }
+
+  .toggle-track.multi { border-color: var(--accent2); }
+
+  .toggle-thumb {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(0,255,157,0.5);
+    transition: transform 0.2s, background 0.2s;
+  }
+
+  .toggle-track.multi .toggle-thumb {
+    transform: translateX(20px);
+  }
+
+  .mode-desc {
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    flex: 1;
+    text-align: right;
+  }
+
+
+  .beat-dot.loop-end {
+    border: 1px solid var(--accent);
+    box-shadow: 0 0 5px rgba(0,255,157,0.4);
+    position: relative;
+  }
+
+  .beat-dot.loop-end::after {
+    content: '';
+    position: absolute;
+    right: -1px;
+    top: 1px;
+    bottom: 1px;
+    width: 2px;
+    background: var(--accent);
+    border-radius: 1px;
+    opacity: 0.8;
+  }
+
 </style>
 </head>
 <body>
@@ -698,6 +801,17 @@
       <span class="scale-badge" id="scaleBadge">MAQAM RAST</span>
       <span class="pill active" id="bpmPill">82 BPM</span>
     </div>
+  </div>
+
+
+  <!-- Voice Mode Toggle -->
+  <div class="mode-toggle" id="modeToggleBar">
+    <span class="mode-label active" id="labelSingle">SINGLE OSC</span>
+    <div class="toggle-track" id="modeToggle">
+      <div class="toggle-thumb" id="modeThumb"></div>
+    </div>
+    <span class="mode-label" id="labelMulti">MULTI OSC</span>
+    <span class="mode-desc" id="modeDesc">one voice, knob turns</span>
   </div>
 
   <!-- VU Meters -->
@@ -818,115 +932,31 @@ const SCALE_NAMES = {
 };
 const ROOTS = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 
-// Role colors for display
+// Role colors
 const ROLE_COLORS = {
-  kick:   '#00ff9d',
-  bass:   '#00cc6a',
-  snare:  '#80ffd0',
-  hihat:  '#33ffaa',
-  melody: '#00ff6a',
-  stab:   '#b3ffe0',
+  kick:'#00ff9d', bass:'#00cc6a', snare:'#80ffd0',
+  hihat:'#33ffaa', melody:'#00ff6a', stab:'#b3ffe0',
 };
 
 // ============================================================
 // ROLES
 // ============================================================
 const ROLES = {
-  kick:   { id:'kick',   label:'KICK',   wave:'sine',     filterFreq:80,   filterQ:0.7, att:0.001, dec:0.45, sus:0,    rel:0.2,  noise:0,    oct:0,  pitchDrop:true  },
-  bass:   { id:'bass',   label:'BASS',   wave:'triangle', filterFreq:420,  filterQ:1.5, att:0.008, dec:0.5,  sus:0.25, rel:0.3,  noise:0,    oct:-1, pitchDrop:false },
-  snare:  { id:'snare',  label:'SNARE',  wave:'sawtooth', filterFreq:2800, filterQ:2.5, att:0.001, dec:0.18, sus:0,    rel:0.38, noise:0.85, oct:1,  pitchDrop:false },
-  hihat:  { id:'hihat',  label:'HIHAT',  wave:'square',   filterFreq:8000, filterQ:0.8, att:0.001, dec:0.05, sus:0,    rel:0.04, noise:0.9,  oct:2,  pitchDrop:false },
-  melody: { id:'melody', label:'MELODY', wave:'triangle', filterFreq:1600, filterQ:10,  att:0.012, dec:0.4,  sus:0.4,  rel:0.4,  noise:0,    oct:1,  pitchDrop:false },
-  stab:   { id:'stab',   label:'STAB',   wave:'sawtooth', filterFreq:900,  filterQ:16,  att:0.001, dec:0.1,  sus:0,    rel:0.12, noise:0,    oct:0,  pitchDrop:false },
+  kick:   { id:'kick',   label:'KICK',   wave:'sine',     filterFreq:80,   filterQ:0.7, att:0.001, dec:0.45, sus:0,    rel:0.2,  oct:0,  pitchDrop:true  },
+  bass:   { id:'bass',   label:'BASS',   wave:'triangle', filterFreq:420,  filterQ:1.5, att:0.008, dec:0.5,  sus:0.25, rel:0.3,  oct:-1, pitchDrop:false },
+  snare:  { id:'snare',  label:'SNARE',  wave:'sawtooth', filterFreq:2800, filterQ:2.5, att:0.001, dec:0.18, sus:0,    rel:0.38, oct:1,  pitchDrop:false },
+  hihat:  { id:'hihat',  label:'HIHAT',  wave:'square',   filterFreq:8000, filterQ:0.8, att:0.001, dec:0.05, sus:0,    rel:0.04, oct:2,  pitchDrop:false },
+  melody: { id:'melody', label:'MELODY', wave:'triangle', filterFreq:1600, filterQ:10,  att:0.012, dec:0.4,  sus:0.4,  rel:0.4,  oct:1,  pitchDrop:false },
+  stab:   { id:'stab',   label:'STAB',   wave:'sawtooth', filterFreq:900,  filterQ:16,  att:0.001, dec:0.1,  sus:0,    rel:0.12, oct:0,  pitchDrop:false },
 };
 
 // ============================================================
-// MELODIC PROGRESSION ENGINE
-// Patterns are built around a phrase: root, movement, tension, resolve
-// Randomize nudges into new territory while respecting voice leading
+// PATTERNS
 // ============================================================
+let lockedPattern = [];
+let lockedMidi    = [];
+let pendingPattern = null;
 
-// Current phrase state — persists across loops, evolves on randomize
-let phraseRoot = 2;       // index into scale (starts on 2nd degree for interest)
-let phraseDirection = 1;  // +1 ascending, -1 descending
-let phraseTension = 0.3;  // 0=stable, 1=restless — affects note choice spread
-let phraseOctaveShift = 0;// -1, 0, +1
-
-// The locked 16-step sequence — rebuilt each loop start if pending
-let lockedPattern = [];   // roleId or null per step
-let lockedMidi    = [];   // midi note number per step (melodic voice leading)
-let pendingPattern = null; // queued for next loop boundary
-
-// Melodic note memory — last played midi per voice for smooth voice leading
-let lastMidi = { melody:45, bass:33, stab:45, kick:33, snare:50, hihat:62 };
-
-function midiToFreq(midi) { return 440 * Math.pow(2, (midi-69)/12); }
-
-function scaleNotes(scaleName, rootSemitone, octave) {
-  // Return array of midi notes spanning ~2.5 octaves for voice leading
-  const scale = SCALES[scaleName] || SCALES.maqamRast;
-  const notes = [];
-  for (let oct = octave-1; oct <= octave+2; oct++) {
-    for (const semi of scale) {
-      notes.push(12 + rootSemitone + semi + oct*12);
-    }
-  }
-  return notes.sort((a,b) => a-b);
-}
-
-function closestScaleNote(targetMidi, scaleName, rootSemitone, octave, octaveBias) {
-  const notes = scaleNotes(scaleName, rootSemitone, octave + (octaveBias||0));
-  // Find closest note, with slight bias toward movement
-  let best = notes[0], bestDist = Math.abs(best - targetMidi);
-  for (const n of notes) {
-    const d = Math.abs(n - targetMidi);
-    if (d < bestDist) { best = n; bestDist = d; }
-  }
-  return best;
-}
-
-function nextMelodicNote(roleId, stepIdx, totalSteps) {
-  const role = ROLES[roleId];
-  const rootSemitone = ROOTS.indexOf(rootNote);
-  const scale = SCALES[currentScale] || SCALES.maqamRast;
-  const scaleNotesMidi = scaleNotes(currentScale, rootSemitone, octaveBase + (role.oct||0));
-
-  const prev = lastMidi[roleId] || scaleNotesMidi[Math.floor(scaleNotesMidi.length/2)];
-
-  // Voice leading: prefer small steps (±2-5 semitones), occasionally leap
-  // Tension controls how far we wander
-  const stepSize = phraseTension < 0.4
-    ? (Math.random() < 0.7 ? 2 : 5)   // stable: mostly steps
-    : phraseTension < 0.7
-    ? (Math.random() < 0.5 ? 3 : 7)   // medium: steps + leaps
-    : (Math.random() < 0.3 ? 2 : 9);  // restless: leaps dominate
-
-  // Direction with drift
-  let dir = phraseDirection;
-  if (Math.random() < 0.25) dir = -dir; // occasional contrary motion
-
-  // Phrase position shapes contour: rise in first half, resolve in second
-  const pos = stepIdx / totalSteps;
-  if (pos > 0.7 && phraseTension > 0.3) dir = -Math.abs(dir); // resolve downward late
-
-  const target = prev + dir * stepSize * (0.7 + Math.random()*0.6);
-
-  // Clamp to reasonable range per voice
-  const ranges = { kick:[24,48], bass:[28,52], snare:[48,72], hihat:[60,80], melody:[48,76], stab:[40,68] };
-  const [lo, hi] = ranges[roleId] || [36,72];
-  const clamped = Math.max(lo, Math.min(hi, Math.round(target)));
-
-  // Snap to nearest scale note
-  const snapped = closestScaleNote(clamped, currentScale, rootSemitone, octaveBase, role.oct||0);
-  const final = Math.max(lo, Math.min(hi, snapped));
-
-  lastMidi[roleId] = final;
-  return final;
-}
-
-// ============================================================
-// PATTERN BUILDER
-// ============================================================
 let currentProbMap = {
   kickStrong:0.92, kickWeak:0.7,  kickGhost:0.12, kickOdd:0.04,
   bassOn:0.75,     bassOff:0.25,  bassGhost:0.08,
@@ -936,72 +966,100 @@ let currentProbMap = {
   stabOn:0.45,     stabOff:0.04,
 };
 
+// Phrase state
+let phraseRoot = 2;
+let phraseDirection = 1;
+let phraseTension = 0.3;
+let phraseOctaveShift = 0;
+let lastMidi = { melody:45, bass:33, stab:45, kick:33, snare:50, hihat:62 };
+
+function midiToFreq(m) { return 440 * Math.pow(2, (m-69)/12); }
+
+function scaleNotesMidi(scaleName, rootSemitone, octave) {
+  const scale = SCALES[scaleName] || SCALES.maqamRast;
+  const notes = [];
+  for (let oct = octave-1; oct <= octave+2; oct++)
+    for (const s of scale) notes.push(12 + rootSemitone + s + oct*12);
+  return notes.sort((a,b)=>a-b);
+}
+
+function nextMelodicNote(roleId, stepIdx) {
+  const role = ROLES[roleId];
+  const rootSemitone = ROOTS.indexOf(rootNote);
+  const notes = scaleNotesMidi(currentScale, rootSemitone, octaveBase + (role.oct||0));
+  const prev = lastMidi[roleId] || notes[Math.floor(notes.length/2)];
+  const stepSize = phraseTension < 0.4 ? (Math.random()<0.7?2:5) : phraseTension<0.7 ? (Math.random()<0.5?3:7) : (Math.random()<0.3?2:9);
+  let dir = phraseDirection;
+  if (Math.random()<0.25) dir=-dir;
+  const pos = stepIdx/16;
+  if (pos>0.7 && phraseTension>0.3) dir=-Math.abs(dir);
+  const target = prev + dir*stepSize*(0.7+Math.random()*0.6);
+  const ranges = {kick:[24,48],bass:[28,52],snare:[48,72],hihat:[60,80],melody:[48,76],stab:[40,68]};
+  const [lo,hi] = ranges[roleId]||[36,72];
+  const clamped = Math.max(lo,Math.min(hi,Math.round(target)));
+  let best=notes[0], bestD=Math.abs(best-clamped);
+  for (const n of notes){const d=Math.abs(n-clamped);if(d<bestD){best=n;bestD=d;}}
+  const final = Math.max(lo,Math.min(hi,best));
+  lastMidi[roleId]=final;
+  return final;
+}
+
 function buildPattern(pm) {
-  const stepProbs = { kick:[], bass:[], snare:[], hihat:[], melody:[], stab:[] };
-  for (let i=0; i<16; i++) {
-    stepProbs.kick[i]   = [0,8].includes(i)?pm.kickStrong:[4,12].includes(i)?pm.kickWeak:i%2===0?pm.kickGhost:pm.kickOdd;
-    stepProbs.bass[i]   = [0,4,8,12].includes(i)?pm.bassOn:i%2===0?pm.bassOff:pm.bassGhost;
-    stepProbs.snare[i]  = [4,12].includes(i)?pm.snareOn:[2,6,10,14].includes(i)?pm.snareOff:pm.snareGhost;
-    stepProbs.hihat[i]  = i%2===0?pm.hihatOn:pm.hihatOff;
-    stepProbs.melody[i] = [0,3,5,8,11,13].includes(i)?pm.melOn:pm.melOff;
-    stepProbs.stab[i]   = [2,9,13].includes(i)?pm.stabOn:pm.stabOff;
+  const sp={kick:[],bass:[],snare:[],hihat:[],melody:[],stab:[]};
+  for(let i=0;i<16;i++){
+    sp.kick[i]  =[0,8].includes(i)?pm.kickStrong:[4,12].includes(i)?pm.kickWeak:i%2===0?pm.kickGhost:pm.kickOdd;
+    sp.bass[i]  =[0,4,8,12].includes(i)?pm.bassOn:i%2===0?pm.bassOff:pm.bassGhost;
+    sp.snare[i] =[4,12].includes(i)?pm.snareOn:[2,6,10,14].includes(i)?pm.snareOff:pm.snareGhost;
+    sp.hihat[i] =i%2===0?pm.hihatOn:pm.hihatOff;
+    sp.melody[i]=[0,3,5,8,11,13].includes(i)?pm.melOn:pm.melOff;
+    sp.stab[i]  =[2,9,13].includes(i)?pm.stabOn:pm.stabOff;
   }
-  const order = ['kick','snare','bass','melody','stab','hihat'];
-  const pat = [], midi = [];
-  for (let i=0; i<16; i++) {
-    let chosen = null;
-    for (const rid of order) {
-      if (Math.random() < stepProbs[rid][i]) { chosen = rid; break; }
-    }
-    pat[i] = chosen;
-    midi[i] = chosen ? nextMelodicNote(chosen, i, 16) : null;
+  const order=['kick','snare','bass','melody','stab','hihat'];
+  const pat=[],midi=[];
+  for(let i=0;i<16;i++){
+    let chosen=null;
+    for(const rid of order){if(Math.random()<sp[rid][i]){chosen=rid;break;}}
+    pat[i]=chosen;
+    midi[i]=chosen?nextMelodicNote(chosen,i):null;
   }
-  return { pat, midi };
+  return {pat,midi};
 }
 
 function commitPattern(built) {
-  lockedPattern = built.pat;
-  lockedMidi    = built.midi;
+  lockedPattern=built.pat; lockedMidi=built.midi;
   updateBeatGridDots();
 }
 
 function randomizeProbMap() {
-  const nudge = (v, lo, hi, amt) => Math.max(lo, Math.min(hi, v + (Math.random()-0.5)*amt));
-  currentProbMap = {
-    kickStrong: nudge(currentProbMap.kickStrong, 0.5, 1.0, 0.4),
-    kickWeak:   nudge(currentProbMap.kickWeak,   0.2, 0.95, 0.5),
-    kickGhost:  nudge(currentProbMap.kickGhost,  0, 0.5, 0.3),
-    kickOdd:    nudge(currentProbMap.kickOdd,    0, 0.25, 0.15),
-    bassOn:     nudge(currentProbMap.bassOn,     0.3, 1.0, 0.5),
-    bassOff:    nudge(currentProbMap.bassOff,    0, 0.6, 0.35),
-    bassGhost:  nudge(currentProbMap.bassGhost,  0, 0.25, 0.2),
-    snareOn:    nudge(currentProbMap.snareOn,    0.4, 1.0, 0.4),
-    snareOff:   nudge(currentProbMap.snareOff,   0, 0.45, 0.3),
-    snareGhost: nudge(currentProbMap.snareGhost, 0, 0.2, 0.15),
-    hihatOn:    nudge(currentProbMap.hihatOn,    0.2, 1.0, 0.5),
-    hihatOff:   nudge(currentProbMap.hihatOff,   0.05, 0.8, 0.4),
-    melOn:      nudge(currentProbMap.melOn,      0.1, 0.9, 0.5),
-    melOff:     nudge(currentProbMap.melOff,     0, 0.35, 0.25),
-    stabOn:     nudge(currentProbMap.stabOn,     0.05, 0.85, 0.4),
-    stabOff:    nudge(currentProbMap.stabOff,    0, 0.18, 0.12),
+  const nudge=(v,lo,hi,amt)=>Math.max(lo,Math.min(hi,v+(Math.random()-0.5)*amt));
+  currentProbMap={
+    kickStrong:nudge(currentProbMap.kickStrong,0.5,1.0,0.4),
+    kickWeak:nudge(currentProbMap.kickWeak,0.2,0.95,0.5),
+    kickGhost:nudge(currentProbMap.kickGhost,0,0.5,0.3),
+    kickOdd:nudge(currentProbMap.kickOdd,0,0.25,0.15),
+    bassOn:nudge(currentProbMap.bassOn,0.3,1.0,0.5),
+    bassOff:nudge(currentProbMap.bassOff,0,0.6,0.35),
+    bassGhost:nudge(currentProbMap.bassGhost,0,0.25,0.2),
+    snareOn:nudge(currentProbMap.snareOn,0.4,1.0,0.4),
+    snareOff:nudge(currentProbMap.snareOff,0,0.45,0.3),
+    snareGhost:nudge(currentProbMap.snareGhost,0,0.2,0.15),
+    hihatOn:nudge(currentProbMap.hihatOn,0.2,1.0,0.5),
+    hihatOff:nudge(currentProbMap.hihatOff,0.05,0.8,0.4),
+    melOn:nudge(currentProbMap.melOn,0.1,0.9,0.5),
+    melOff:nudge(currentProbMap.melOff,0,0.35,0.25),
+    stabOn:nudge(currentProbMap.stabOn,0.05,0.85,0.4),
+    stabOff:nudge(currentProbMap.stabOff,0,0.18,0.12),
   };
-
-  phraseDirection = Math.random() < 0.35 ? -phraseDirection : phraseDirection;
-  phraseTension = Math.max(0.1, Math.min(0.9, phraseTension + (Math.random()-0.5)*0.4));
-  phraseOctaveShift = Math.random() < 0.2 ? (Math.floor(Math.random()*3)-1) : phraseOctaveShift;
-
-  if (Math.random() < 0.4) {
-    const rootSemi = ROOTS.indexOf(rootNote);
-    const steps = [-2,-1,0,0,0,1,2];
-    const shift = steps[Math.floor(Math.random()*steps.length)];
-    rootNote = ROOTS[(rootSemi + shift + 12) % 12];
+  phraseDirection=Math.random()<0.35?-phraseDirection:phraseDirection;
+  phraseTension=Math.max(0.1,Math.min(0.9,phraseTension+(Math.random()-0.5)*0.4));
+  if(Math.random()<0.4){
+    const rs=ROOTS.indexOf(rootNote);
+    const steps=[-2,-1,0,0,0,1,2];
+    rootNote=ROOTS[(rs+steps[Math.floor(Math.random()*steps.length)]+12)%12];
   }
-
-  // Apply immediately — mid-loop, mid-phrase, doesn't matter
-  const built = buildPattern(currentProbMap);
+  const built=buildPattern(currentProbMap);
   commitPattern(built);
-  activeSlotIdx = -1;
-  pendingPattern = null;
+  activeSlotIdx=-1;
   renderSlots();
   updateSlotStatus();
 }
@@ -1013,7 +1071,7 @@ let audioCtx = null;
 let isPlaying = false;
 let currentScale = 'maqamRast';
 let currentBPM = 82;
-let morphTime = 0.08;
+let morphTime = 0.05;
 let hiVolDb = -24;
 let driveAmount = 0.05;
 let rootNote = 'D';
@@ -1021,93 +1079,134 @@ let octaveBase = 2;
 let currentStep = 0;
 let schedulerId = null;
 let nextStepTime = 0;
+let loopLength = 16; // tap a dot to set last step
 
-let masterGain, driftMasterGain, hiShelfFilter, compressor, waveshaper, analyserNode, filterNode, noiseGainNode, noiseBufferSrc;
-let driftFilter, driftShaper, driftHiShelf;
+// === THE ONE OSCILLATOR ===
+let theOsc = null;         // single persistent oscillator — never recreated
+let theEnv = null;         // its amplitude envelope gain
+let theNoiseGain = null;   // noise blended in for snare/hihat texture
+let theNoiseSrc = null;
+
+// Shared processing chain
+let theFilter = null;
+let theShaper = null;
+let theHiShelf = null;
+let theComp = null;
+let theAnalyser = null;
+let masterGain = null;
+
+// Drift output (separate gain so loop can be muted independently)
+let driftMasterGain = null;
+let driftFilter = null;
+let driftShaper = null;
+let driftHiShelf = null;
+
+// Kill gain — silences ALL oscillators instantly (used on drift release)
+let killGain = null;
+// Track all live multi-osc nodes so we can force-stop them
+let activeOscs = [];
+let lastMultiEnv = null; // most recent multi osc envelope
+// Dedicated bus for multi oscs — zero this to silence all of them instantly
+let multiOscBus = null;
+
+// Tracked synth state
 let filterFreqNow = 800;
 let filterQNow = 2;
-let noiseNow = 0;
-let lastFiredRoleId = null;   // most recent role that fired
-let lastFiredMidi   = null;   // most recent midi note that fired
-let lastFiredWave   = 'sine'; // most recent oscillator type
+let lastFiredRoleId = null;
+let lastFiredMidi = null;
+let lastFiredWave = 'sine';
+
+function makeDistCurve(amount) {
+  const n=256, c=new Float32Array(n);
+  for(let i=0;i<n;i++){const x=(i*2/n)-1;c[i]=(Math.PI+amount)*x/(Math.PI+amount*Math.abs(x));}
+  return c;
+}
 
 // ============================================================
-// AUDIO INIT
+// AUDIO INIT — build the single persistent voice
 // ============================================================
 function initAudio(bpm, scaleName) {
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   currentBPM = bpm;
   currentScale = scaleName;
 
+  // === PROCESSING CHAIN (shared by sequencer and drift) ===
   masterGain = audioCtx.createGain();
   masterGain.gain.value = 0.82;
   masterGain.connect(audioCtx.destination);
 
-  // Separate gain for drift — always connected to destination, not through masterGain
+  theHiShelf = audioCtx.createBiquadFilter();
+  theHiShelf.type = 'highshelf';
+  theHiShelf.frequency.value = 3500;
+  theHiShelf.gain.value = hiVolDb;
+  theHiShelf.connect(masterGain);
+
+  theComp = audioCtx.createDynamicsCompressor();
+  theComp.threshold.value = -16;
+  theComp.knee.value = 8;
+  theComp.ratio.value = 3;
+  theComp.attack.value = 0.003;
+  theComp.release.value = 0.12;
+  theComp.connect(theHiShelf);
+
+  theShaper = audioCtx.createWaveShaper();
+  theShaper.curve = makeDistCurve(driveAmount * 180);
+  theShaper.oversample = '4x';
+  theShaper.connect(theComp);
+
+  theAnalyser = audioCtx.createAnalyser();
+  theAnalyser.fftSize = 512;
+  theAnalyser.connect(theShaper);
+
+  // Kill gain sits between filter and analyser — zeroing it silences everything instantly
+  killGain = audioCtx.createGain();
+  killGain.gain.value = 1;
+  killGain.connect(theAnalyser);
+
+  theFilter = audioCtx.createBiquadFilter();
+  theFilter.type = 'lowpass';
+  theFilter.frequency.value = 800;
+  theFilter.Q.value = 2;
+  theFilter.connect(killGain);
+
+  // Multi osc bus — all spawned oscs connect here, not directly to theFilter
+  // Zeroing this instantly silences all multi oscs without affecting single osc
+  multiOscBus = audioCtx.createGain();
+  multiOscBus.gain.value = 1;
+  multiOscBus.connect(theFilter);
+
+  // Noise — blended in for snare/hihat, near zero for tonal roles
+  const noiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate*3, audioCtx.sampleRate);
+  const nd = noiseBuf.getChannelData(0);
+  for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
+  theNoiseSrc = audioCtx.createBufferSource();
+  theNoiseSrc.buffer = noiseBuf;
+  theNoiseSrc.loop = true;
+  theNoiseGain = audioCtx.createGain();
+  theNoiseGain.gain.value = 0;
+  theNoiseSrc.connect(theNoiseGain);
+  theNoiseGain.connect(theFilter);
+  theNoiseSrc.start();
+
+  // === THE ONE OSCILLATOR — started once, runs forever ===
+  theEnv = audioCtx.createGain();
+  theEnv.gain.value = 0;   // silent until a note fires
+  theEnv.connect(theFilter);
+
+  theOsc = audioCtx.createOscillator();
+  theOsc.type = 'sine';
+  theOsc.frequency.value = midiToFreq(45);
+  theOsc.connect(theEnv);
+  theOsc.start();          // starts and NEVER stops
+
+  // === DRIFT OUTPUT (muted by default, activated during drift hold) ===
   driftMasterGain = audioCtx.createGain();
   driftMasterGain.gain.value = 0;
   driftMasterGain.connect(audioCtx.destination);
 
-  // Drift has its own filter + waveshaper so modulation works independently
-  driftFilter = audioCtx.createBiquadFilter();
-  driftFilter.type = 'lowpass';
-  driftFilter.frequency.value = 800;
-  driftFilter.Q.value = 2;
-
-  driftShaper = audioCtx.createWaveShaper();
-  driftShaper.curve = makeDistCurve(driveAmount * 180);
-  driftShaper.oversample = '4x';
-
-  driftHiShelf = audioCtx.createBiquadFilter();
-  driftHiShelf.type = 'highshelf';
-  driftHiShelf.frequency.value = 3000;
-  driftHiShelf.gain.value = -10; // tame high freq harshness on drift
-
-  driftFilter.connect(driftShaper);
-  driftShaper.connect(driftHiShelf);
-  driftHiShelf.connect(driftMasterGain);
-
-  hiShelfFilter = audioCtx.createBiquadFilter();
-  hiShelfFilter.type = 'highshelf';
-  hiShelfFilter.frequency.value = 3500;
-  hiShelfFilter.gain.value = hiVolDb;
-  hiShelfFilter.connect(masterGain);
-
-  compressor = audioCtx.createDynamicsCompressor();
-  compressor.threshold.value = -16;
-  compressor.knee.value = 8;
-  compressor.ratio.value = 3;
-  compressor.attack.value = 0.003;
-  compressor.release.value = 0.12;
-  compressor.connect(hiShelfFilter);
-
-  waveshaper = audioCtx.createWaveShaper();
-  waveshaper.curve = makeDistCurve(driveAmount * 180);
-  waveshaper.oversample = '4x';
-  waveshaper.connect(compressor);
-
-  analyserNode = audioCtx.createAnalyser();
-  analyserNode.fftSize = 512;
-  analyserNode.connect(waveshaper);
-
-  filterNode = audioCtx.createBiquadFilter();
-  filterNode.type = 'lowpass';
-  filterNode.frequency.value = 800;
-  filterNode.Q.value = 2;
-  filterNode.connect(analyserNode);
-
-  const bufSize = audioCtx.sampleRate * 3;
-  const noiseBuf = audioCtx.createBuffer(1, bufSize, audioCtx.sampleRate);
-  const nd = noiseBuf.getChannelData(0);
-  for (let i=0; i<bufSize; i++) nd[i] = Math.random()*2-1;
-  noiseBufferSrc = audioCtx.createBufferSource();
-  noiseBufferSrc.buffer = noiseBuf;
-  noiseBufferSrc.loop = true;
-  noiseGainNode = audioCtx.createGain();
-  noiseGainNode.gain.value = 0;
-  noiseBufferSrc.connect(noiseGainNode);
-  noiseGainNode.connect(filterNode);
-  noiseBufferSrc.start();
+  // Drift uses the SAME theFilter/theOsc chain but output routes differently
+  // We achieve this by having driftMasterGain tap from theAnalyser output too
+  theAnalyser.connect(driftMasterGain);
 
   const built = buildPattern(currentProbMap);
   commitPattern(built);
@@ -1116,112 +1215,101 @@ function initAudio(bpm, scaleName) {
   startVU();
 }
 
-function makeDistCurve(amount) {
-  const n=256, c=new Float32Array(n);
-  for(let i=0;i<n;i++){const x=(i*2/n)-1; c[i]=(Math.PI+amount)*x/(Math.PI+amount*Math.abs(x));}
-  return c;
-}
-
 // ============================================================
-// FIRE NOTE — role-specific filter morphs
+// FIRE NOTE — manipulates the ONE oscillator in real time
+// No new oscillators ever created. Just knob turns.
 // ============================================================
 function fireNote(roleId, midiNote, startTime) {
   const role = ROLES[roleId];
   const freq = midiToFreq(midiNote);
   const t = startTime;
-  const mt = morphTime; // live value — slider affects immediately
+  const mt = morphTime;
 
-  filterNode.frequency.cancelScheduledValues(t);
-  filterNode.Q.cancelScheduledValues(t);
+  // === WAVE TYPE — just set it, no crossfade needed, it's instantaneous character ===
+  try { theOsc.type = role.wave; } catch(e) {}
 
-  // mt drives ALL morph durations — slider is fully real-time
-  // min floors keep percussive snap even at mt=0
-  const kickDur   = Math.max(0.02,  mt * 2.0);   // kick: slam filter shut
-  const snareCrk  = Math.max(0.004, mt * 0.15);  // snare crack: fast snap open
-  const snareTail = Math.max(0.12,  mt * 4.0);   // snare tail: noise bleed
-  const melDur    = Math.max(0.05,  mt * 3.0);   // melody bloom
-  const bassDur   = Math.max(0.03,  mt * 2.5);   // bass settle
-  const stabDur   = Math.max(0.01,  mt * 1.2);   // stab spike
-  const hatDur    = Math.max(0.003, mt * 0.5);   // hihat snap
+  // === FREQUENCY — the pitch, locked to scale ===
+  if (role.pitchDrop) {
+    theOsc.frequency.cancelScheduledValues(t);
+    theOsc.frequency.setValueAtTime(freq * 4, t);
+    theOsc.frequency.exponentialRampToValueAtTime(freq * 0.5, t + 0.18);
+  } else {
+    theOsc.frequency.cancelScheduledValues(t);
+    theOsc.frequency.setValueAtTime(freq, t);
+  }
+
+  // === FILTER MORPH — the signature sound, knobs being turned ===
+  theFilter.frequency.cancelScheduledValues(t);
+  theFilter.Q.cancelScheduledValues(t);
+
+  const kickDur   = Math.max(0.02, mt * 2.0);
+  const snareCrk  = Math.max(0.004, mt * 0.15);
+  const snareTail = Math.max(0.12, mt * 4.0);
+  const melDur    = Math.max(0.05, mt * 3.0);
+  const bassDur   = Math.max(0.03, mt * 2.5);
+  const stabDur   = Math.max(0.01, mt * 1.2);
+  const hatDur    = Math.max(0.003, mt * 0.5);
 
   if (roleId === 'kick') {
-    filterNode.frequency.setValueAtTime(Math.max(filterFreqNow, 500), t);
-    filterNode.frequency.exponentialRampToValueAtTime(80, t + kickDur);
-    filterNode.Q.setValueAtTime(4, t);
-    filterNode.Q.linearRampToValueAtTime(0.7, t + kickDur);
+    theFilter.frequency.setValueAtTime(Math.max(filterFreqNow, 500), t);
+    theFilter.frequency.exponentialRampToValueAtTime(80, t + kickDur);
+    theFilter.Q.setValueAtTime(4, t);
+    theFilter.Q.linearRampToValueAtTime(0.7, t + kickDur);
   } else if (roleId === 'snare') {
-    filterNode.frequency.setValueAtTime(Math.min(filterFreqNow, 600), t);
-    filterNode.frequency.exponentialRampToValueAtTime(3200, t + snareCrk);
-    filterNode.frequency.exponentialRampToValueAtTime(1400, t + snareTail);
-    filterNode.Q.setValueAtTime(3, t);
-    filterNode.Q.linearRampToValueAtTime(1, t + snareTail);
+    theFilter.frequency.setValueAtTime(Math.min(filterFreqNow, 600), t);
+    theFilter.frequency.exponentialRampToValueAtTime(3200, t + snareCrk);
+    theFilter.frequency.exponentialRampToValueAtTime(1400, t + snareTail);
+    theFilter.Q.setValueAtTime(3, t);
+    theFilter.Q.linearRampToValueAtTime(1, t + snareTail);
   } else if (roleId === 'melody') {
-    const startFreq = Math.max(200, Math.min(filterFreqNow, 800));
-    filterNode.frequency.setValueAtTime(startFreq, t);
-    filterNode.frequency.exponentialRampToValueAtTime(role.filterFreq, t + melDur);
-    filterNode.Q.setValueAtTime(Math.max(1, filterQNow), t);
-    filterNode.Q.exponentialRampToValueAtTime(role.filterQ, t + melDur);
+    theFilter.frequency.setValueAtTime(Math.max(200, Math.min(filterFreqNow, 800)), t);
+    theFilter.frequency.exponentialRampToValueAtTime(role.filterFreq, t + melDur);
+    theFilter.Q.setValueAtTime(Math.max(1, filterQNow), t);
+    theFilter.Q.exponentialRampToValueAtTime(role.filterQ, t + melDur);
   } else if (roleId === 'bass') {
-    filterNode.frequency.setValueAtTime(filterFreqNow, t);
-    filterNode.frequency.exponentialRampToValueAtTime(role.filterFreq, t + bassDur);
-    filterNode.Q.setValueAtTime(Math.max(0.5, filterQNow), t);
-    filterNode.Q.linearRampToValueAtTime(role.filterQ, t + bassDur);
+    theFilter.frequency.setValueAtTime(filterFreqNow, t);
+    theFilter.frequency.exponentialRampToValueAtTime(role.filterFreq, t + bassDur);
+    theFilter.Q.setValueAtTime(Math.max(0.5, filterQNow), t);
+    theFilter.Q.linearRampToValueAtTime(role.filterQ, t + bassDur);
   } else if (roleId === 'stab') {
-    filterNode.frequency.setValueAtTime(2800, t);
-    filterNode.frequency.exponentialRampToValueAtTime(role.filterFreq, t + stabDur);
-    filterNode.Q.setValueAtTime(20, t);
-    filterNode.Q.linearRampToValueAtTime(role.filterQ, t + stabDur);
+    theFilter.frequency.setValueAtTime(2800, t);
+    theFilter.frequency.exponentialRampToValueAtTime(role.filterFreq, t + stabDur);
+    theFilter.Q.setValueAtTime(20, t);
+    theFilter.Q.linearRampToValueAtTime(role.filterQ, t + stabDur);
   } else if (roleId === 'hihat') {
-    filterNode.frequency.setValueAtTime(filterFreqNow, t);
-    filterNode.frequency.exponentialRampToValueAtTime(role.filterFreq, t + hatDur);
-    filterNode.Q.setValueAtTime(filterQNow, t);
-    filterNode.Q.linearRampToValueAtTime(role.filterQ, t + hatDur);
+    theFilter.frequency.setValueAtTime(filterFreqNow, t);
+    theFilter.frequency.exponentialRampToValueAtTime(role.filterFreq, t + hatDur);
+    theFilter.Q.setValueAtTime(filterQNow, t);
+    theFilter.Q.linearRampToValueAtTime(role.filterQ, t + hatDur);
   }
 
   filterFreqNow = role.filterFreq;
   filterQNow = role.filterQ;
 
-  // Noise morph
-  noiseGainNode.gain.cancelScheduledValues(t);
-  noiseGainNode.gain.setValueAtTime(noiseNow, t);
-  if (role.noise > 0) {
-    noiseGainNode.gain.linearRampToValueAtTime(role.noise * 0.55, t + 0.003);
-    if (roleId === 'snare') {
-      noiseGainNode.gain.setTargetAtTime(0.05, t + role.dec, role.rel * 0.9 + 0.06);
-      noiseGainNode.gain.setTargetAtTime(0, t + role.dec + role.rel, 0.08);
+  // === NOISE — blended for snare/hihat, absent for tonal roles ===
+  const targetNoise = roleId==='snare' ? 0.5 : roleId==='hihat' ? 0.55 : 0;
+  theNoiseGain.gain.cancelScheduledValues(t);
+  theNoiseGain.gain.setValueAtTime(theNoiseGain.gain.value, t);
+  if (targetNoise > 0) {
+    theNoiseGain.gain.linearRampToValueAtTime(targetNoise, t + 0.003);
+    if (roleId==='snare') {
+      theNoiseGain.gain.setTargetAtTime(0.05, t + role.dec, role.rel * 0.9 + 0.06);
+      theNoiseGain.gain.setTargetAtTime(0, t + role.dec + role.rel, 0.08);
     } else {
-      noiseGainNode.gain.setTargetAtTime(0, t + role.dec * 0.5, role.rel * 0.3 + 0.02);
+      theNoiseGain.gain.setTargetAtTime(0, t + role.dec * 0.5, role.rel * 0.3 + 0.02);
     }
-    noiseNow = 0;
   } else {
-    noiseGainNode.gain.linearRampToValueAtTime(0, t + (roleId==='kick' ? Math.max(0.02, mt*0.8) : mt + 0.03));
-    noiseNow = 0;
+    theNoiseGain.gain.linearRampToValueAtTime(0, t + (roleId==='kick' ? Math.max(0.02,mt*0.8) : mt+0.03));
   }
 
-  // Oscillator
-  const osc = audioCtx.createOscillator();
-  osc.type = role.wave;
-  if (role.pitchDrop) {
-    osc.frequency.setValueAtTime(freq * 4, t);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.6, t + 0.06);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.4, t + 0.22);
-  } else {
-    osc.frequency.setValueAtTime(freq, t);
-  }
+  // === AMPLITUDE ENVELOPE — shapes the single osc's volume ===
+  theEnv.gain.cancelScheduledValues(t);
+  theEnv.gain.setValueAtTime(theEnv.gain.value, t);   // start from wherever it currently is
+  theEnv.gain.linearRampToValueAtTime(0.85, t + role.att);
+  theEnv.gain.setTargetAtTime(role.sus * 0.85, t + role.att, role.dec * 0.35 + 0.001);
+  theEnv.gain.setTargetAtTime(0.001, t + role.att + role.dec, role.rel * 0.4 + 0.001);
 
-  const env = audioCtx.createGain();
-  env.gain.setValueAtTime(0.0001, t);
-  env.gain.linearRampToValueAtTime(0.85, t + role.att);
-  env.gain.setTargetAtTime(role.sus * 0.85, t + role.att, role.dec * 0.35 + 0.001);
-  const noteEnd = t + role.att + role.dec + role.rel + 0.1;
-  env.gain.setTargetAtTime(0.0001, t + role.att + role.dec, role.rel * 0.4 + 0.001);
-
-  osc.connect(env);
-  env.connect(filterNode);
-  osc.start(t);
-  osc.stop(noteEnd + 0.05);
-
-  // Track live state for drift inheritance
+  // Track state
   lastFiredRoleId = roleId;
   lastFiredMidi   = midiNote;
   lastFiredWave   = role.wave;
@@ -1237,50 +1325,171 @@ function fireNote(roleId, midiNote, startTime) {
     if(vw) vw.textContent=wmap[role.wave]||role.wave.slice(0,4).toUpperCase();
     if(vf) vf.textContent=fmap[roleId]||'LP';
     if(vr) vr.textContent=role.label;
-    const roleColor = ROLE_COLORS[roleId] || 'var(--accent)';
+    const rc=ROLE_COLORS[roleId]||'var(--accent)';
     ['cellWave','cellFilter','cellRole'].forEach(id=>{
       const el=document.getElementById(id);
-      if(el){
-        el.style.setProperty('--role-color', roleColor);
-        el.classList.add('lit');
-        setTimeout(()=>el.classList.remove('lit'),200);
-      }
+      if(el){el.style.setProperty('--role-color',rc);el.classList.add('lit');setTimeout(()=>el.classList.remove('lit'),200);}
+    });
+  }, domDelay);
+}
+
+
+// ============================================================
+// VOICE MODE — single vs multi oscillator
+// ============================================================
+let voiceMode = 'single'; // 'single' | 'multi'
+
+function setVoiceMode(mode) {
+  voiceMode = mode;
+  const track = document.getElementById('modeToggle');
+  const ls = document.getElementById('labelSingle');
+  const lm = document.getElementById('labelMulti');
+  const desc = document.getElementById('modeDesc');
+  if (mode === 'single') {
+    track.classList.remove('multi');
+    ls.classList.add('active'); lm.classList.remove('active');
+    desc.textContent = 'one voice, knob turns';
+  } else {
+    track.classList.add('multi');
+    lm.classList.add('active'); ls.classList.remove('active');
+    desc.textContent = 'per-note oscillators';
+  }
+}
+
+// Multi-osc fire — spawns a fresh osc per note (original approach)
+function fireNoteMulti(roleId, midiNote, startTime) {
+  const role = ROLES[roleId];
+  const freq = midiToFreq(midiNote);
+  const t = startTime;
+  const mt = morphTime;
+
+  theFilter.frequency.cancelScheduledValues(t);
+  theFilter.Q.cancelScheduledValues(t);
+
+  const kickDur  = Math.max(0.02, mt * 2.0);
+  const snareCrk = Math.max(0.004, mt * 0.15);
+  const snareTail= Math.max(0.12, mt * 4.0);
+  const melDur   = Math.max(0.05, mt * 3.0);
+  const bassDur  = Math.max(0.03, mt * 2.5);
+  const stabDur  = Math.max(0.01, mt * 1.2);
+  const hatDur   = Math.max(0.003, mt * 0.5);
+
+  if (roleId==='kick') {
+    theFilter.frequency.setValueAtTime(Math.max(filterFreqNow,500),t);
+    theFilter.frequency.exponentialRampToValueAtTime(80,t+kickDur);
+    theFilter.Q.setValueAtTime(4,t); theFilter.Q.linearRampToValueAtTime(0.7,t+kickDur);
+  } else if (roleId==='snare') {
+    theFilter.frequency.setValueAtTime(Math.min(filterFreqNow,600),t);
+    theFilter.frequency.exponentialRampToValueAtTime(3200,t+snareCrk);
+    theFilter.frequency.exponentialRampToValueAtTime(1400,t+snareTail);
+    theFilter.Q.setValueAtTime(3,t); theFilter.Q.linearRampToValueAtTime(1,t+snareTail);
+  } else if (roleId==='melody') {
+    theFilter.frequency.setValueAtTime(Math.max(200,Math.min(filterFreqNow,800)),t);
+    theFilter.frequency.exponentialRampToValueAtTime(role.filterFreq,t+melDur);
+    theFilter.Q.setValueAtTime(Math.max(1,filterQNow),t);
+    theFilter.Q.exponentialRampToValueAtTime(role.filterQ,t+melDur);
+  } else if (roleId==='bass') {
+    theFilter.frequency.setValueAtTime(filterFreqNow,t);
+    theFilter.frequency.exponentialRampToValueAtTime(role.filterFreq,t+bassDur);
+    theFilter.Q.setValueAtTime(Math.max(0.5,filterQNow),t);
+    theFilter.Q.linearRampToValueAtTime(role.filterQ,t+bassDur);
+  } else if (roleId==='stab') {
+    theFilter.frequency.setValueAtTime(2800,t);
+    theFilter.frequency.exponentialRampToValueAtTime(role.filterFreq,t+stabDur);
+    theFilter.Q.setValueAtTime(20,t); theFilter.Q.linearRampToValueAtTime(role.filterQ,t+stabDur);
+  } else if (roleId==='hihat') {
+    theFilter.frequency.setValueAtTime(filterFreqNow,t);
+    theFilter.frequency.exponentialRampToValueAtTime(role.filterFreq,t+hatDur);
+    theFilter.Q.setValueAtTime(filterQNow,t); theFilter.Q.linearRampToValueAtTime(role.filterQ,t+hatDur);
+  }
+  filterFreqNow = role.filterFreq;
+  filterQNow = role.filterQ;
+
+  // Noise
+  const targetNoise = roleId==='snare'?0.5:roleId==='hihat'?0.55:0;
+  theNoiseGain.gain.cancelScheduledValues(t);
+  theNoiseGain.gain.setValueAtTime(theNoiseGain.gain.value,t);
+  if (targetNoise>0) {
+    theNoiseGain.gain.linearRampToValueAtTime(targetNoise,t+0.003);
+    if (roleId==='snare') {
+      theNoiseGain.gain.setTargetAtTime(0.05,t+role.dec,role.rel*0.9+0.06);
+      theNoiseGain.gain.setTargetAtTime(0,t+role.dec+role.rel,0.08);
+    } else {
+      theNoiseGain.gain.setTargetAtTime(0,t+role.dec*0.5,role.rel*0.3+0.02);
+    }
+  } else {
+    theNoiseGain.gain.linearRampToValueAtTime(0,t+(roleId==='kick'?Math.max(0.02,mt*0.8):mt+0.03));
+  }
+
+  // Fresh oscillator per note
+  const osc = audioCtx.createOscillator();
+  osc.type = role.wave;
+  if (role.pitchDrop) {
+    osc.frequency.setValueAtTime(freq*4,t);
+    osc.frequency.exponentialRampToValueAtTime(freq*0.5,t+0.18);
+  } else {
+    osc.frequency.setValueAtTime(freq,t);
+  }
+  const env = audioCtx.createGain();
+  env.gain.setValueAtTime(0.0001,t);
+  env.gain.linearRampToValueAtTime(0.85,t+role.att);
+  env.gain.setTargetAtTime(role.sus*0.85,t+role.att,role.dec*0.35+0.001);
+  env.gain.setTargetAtTime(0.0001,t+role.att+role.dec,role.rel*0.4+0.001);
+  osc.connect(env); env.connect(multiOscBus);
+  lastMultiEnv = env; // track for drift release
+  osc.start(t);
+  const stopT = t + role.att + role.dec + role.rel + 0.15;
+  osc.stop(stopT);
+  const entry = { osc, env };
+  activeOscs.push(entry);
+  osc.onended = () => { activeOscs = activeOscs.filter(e => e !== entry); };
+
+  lastFiredRoleId=roleId; lastFiredMidi=midiNote; lastFiredWave=role.wave;
+
+  const domDelay=Math.max(0,(t-audioCtx.currentTime)*1000);
+  setTimeout(()=>{
+    const wmap={sine:'SINE',sawtooth:'SAW',square:'SQR',triangle:'TRI'};
+    const fmap={kick:'LP-',bass:'LP',snare:'BP+',hihat:'HP',melody:'LP+',stab:'BP'};
+    const vw=document.getElementById('valWave');
+    const vf=document.getElementById('valFilter');
+    const vr=document.getElementById('valRole');
+    if(vw) vw.textContent=wmap[role.wave]||role.wave.slice(0,4).toUpperCase();
+    if(vf) vf.textContent=fmap[roleId]||'LP';
+    if(vr) vr.textContent=role.label;
+    const rc=ROLE_COLORS[roleId]||'var(--accent)';
+    ['cellWave','cellFilter','cellRole'].forEach(id=>{
+      const el=document.getElementById(id);
+      if(el){el.style.setProperty('--role-color',rc);el.classList.add('lit');setTimeout(()=>el.classList.remove('lit'),200);}
     });
   }, domDelay);
 }
 
 // ============================================================
-// SEQUENCER — loop with pending pattern swap at bar boundary
+// SEQUENCER
 // ============================================================
 function scheduler() {
   const stepSec = (60 / currentBPM) / 4;
   while (nextStepTime < audioCtx.currentTime + 0.14) {
-    const step = currentStep % 16;
-
-    // Bar boundary marker — pending/queued handled immediately now
-
+    const step = currentStep % loopLength;
     const roleId = lockedPattern[step];
     const midiNote = lockedMidi[step];
-
-    if (roleId && midiNote) {
-      fireNote(roleId, midiNote, nextStepTime);
+    if (roleId && midiNote && !driftActive) {
+      if (voiceMode === 'single') fireNote(roleId, midiNote, nextStepTime);
+      else fireNoteMulti(roleId, midiNote, nextStepTime);
     }
 
-    // Beat grid
-    const t = nextStepTime;
-    const s = step;
-    const rId = roleId;
+    const t = nextStepTime, s = step, rId = roleId;
     setTimeout(() => {
       document.querySelectorAll('.beat-dot').forEach((d,i) => {
         d.classList.remove('current');
-        if (i===s) {
+        if(i===s && i<loopLength){
           d.classList.add('current');
-          if (rId) d.style.setProperty('--dot-color', ROLE_COLORS[rId] || 'var(--accent)');
+          if(rId) d.style.setProperty('--dot-color', ROLE_COLORS[rId]||'var(--accent)');
         }
       });
     }, Math.max(0, (t - audioCtx.currentTime)*1000));
 
-    currentStep++;
+    currentStep = (currentStep + 1) % loopLength;
     nextStepTime += stepSec;
   }
   schedulerId = setTimeout(scheduler, 20);
@@ -1292,11 +1501,284 @@ function startSequencer() {
   scheduler();
 }
 
+
+function killAllActiveOscs() {
+  const now = audioCtx ? audioCtx.currentTime : 0;
+  activeOscs.forEach(({ osc, env }) => {
+    try { env.gain.cancelScheduledValues(now); env.gain.setTargetAtTime(0, now, 0.01); } catch(e) {}
+    try { osc.stop(now + 0.05); } catch(e) {}
+  });
+  activeOscs = [];
+}
+
 function stopSequencer() {
   if (schedulerId) clearTimeout(schedulerId);
   schedulerId = null;
   currentStep = 0;
   document.querySelectorAll('.beat-dot').forEach(d=>d.classList.remove('current'));
+  // Silence single osc
+  if (theEnv) {
+    theEnv.gain.cancelScheduledValues(audioCtx.currentTime);
+    theEnv.gain.setTargetAtTime(0, audioCtx.currentTime, 0.05);
+  }
+  // Kill all lingering multi oscs
+  killAllActiveOscs();
+}
+
+// ============================================================
+// DRIFT — same single oscillator, knobs just keep turning
+// ============================================================
+let driftActive = false;
+let driftRafId = null;
+let stopDriftNoiseFn = null;
+let driftMorphOsc = null; // unused in true single-osc mode but kept for scope safety
+
+// Drift's own dedicated osc+env for multi mode
+let driftOscNode = null;
+let driftEnvNode = null;
+
+function startDrift() {
+  if (!audioCtx || driftActive) return;
+  driftActive = true;
+  document.getElementById('driftBtn').classList.add('active');
+
+  const t = audioCtx.currentTime;
+  const stepSec = (60 / currentBPM) / 4;
+  const barSec = stepSec * 16;
+
+  if (voiceMode === 'single') {
+    // Single mode: hold theOsc envelope open
+    theEnv.gain.cancelScheduledValues(t);
+    theEnv.gain.setValueAtTime(theEnv.gain.value, t);
+    theEnv.gain.linearRampToValueAtTime(0.55, t + 0.05);
+  } else {
+    // Multi mode: spawn a dedicated drift osc, independent of sequencer oscs
+    driftOscNode = audioCtx.createOscillator();
+    driftOscNode.type = lastFiredWave || 'sine';
+    driftOscNode.frequency.value = midiToFreq(lastFiredMidi || 45);
+    driftEnvNode = audioCtx.createGain();
+    driftEnvNode.gain.setValueAtTime(0, t);
+    driftEnvNode.gain.linearRampToValueAtTime(0.55, t + 0.05);
+    driftOscNode.connect(driftEnvNode);
+    driftEnvNode.connect(theFilter); // goes through main filter chain
+    driftOscNode.start(t);
+  }
+
+  // Capture current state
+  const startFilterFreq = filterFreqNow;
+  const startFilterQ = filterQNow;
+  const startWave = lastFiredWave || 'sine';
+
+  // Phase-offset so filter LFO starts at current position
+  const lfo2at0 = Math.sin(1.2) * 0.35;
+  const lfo3at0 = Math.sin(2.5) * 0.15;
+  const startCombo = Math.pow(Math.log(Math.max(60, startFilterFreq) / 60) / Math.log(9000 / 60), 2);
+  const lfo1needed = (startCombo * 2 - 1 - lfo2at0 - lfo3at0) / 0.5;
+  const lfo1Phase = Math.asin(Math.max(-1, Math.min(1, lfo1needed)));
+
+  const waveSeq = ['sine','triangle','sawtooth','square','triangle','sawtooth','sine'];
+  let waveIdx = Math.max(0, waveSeq.indexOf(startWave));
+  let isMorphing = false;
+  let lastWaveMorphTime = t;
+  let waveMorphInterval = barSec * 1.5;
+  const waveMorphDuration = barSec * 2.5;
+
+  let rTargets = { filterFreq:startFilterFreq, filterQ:startFilterQ, pitch:0, detune:0, noise:0 };
+  let rCurrent = { ...rTargets };
+  let rRollTimes = {};
+  const rIntervals = {
+    filterFreq: () => barSec * (0.4 + Math.random() * 1.8),
+    filterQ:    () => barSec * (0.3 + Math.random() * 1.2),
+    pitch:      () => barSec * (3.0 + Math.random() * 4.0),
+    detune:     () => barSec * (1.0 + Math.random() * 2.5),
+    noise:      () => barSec * (0.6 + Math.random() * 1.5),
+  };
+  const rRanges = {
+    filterFreq: () => 60 + Math.random() * 8940,
+    filterQ:    () => 0.5 + Math.random() * 20,
+    pitch:      () => (Math.random() - 0.5) * 80,
+    detune:     () => (Math.random() - 0.5) * 24,
+    noise:      () => Math.random() * 0.12,
+  };
+  const rSpeeds = { filterFreq:0.04, filterQ:0.06, pitch:0.008, detune:0.015, noise:0.03 };
+  for (const k in rIntervals) rRollTimes[k] = t;
+
+  function animateDrift() {
+    if (!driftActive) return;
+    driftRafId = requestAnimationFrame(animateDrift);
+    const now = audioCtx.currentTime;
+    const elapsed = now - t;
+
+    for (const k in rIntervals) {
+      if (now >= rRollTimes[k]) { rTargets[k] = rRanges[k](); rRollTimes[k] = now + rIntervals[k](); }
+      rCurrent[k] += (rTargets[k] - rCurrent[k]) * rSpeeds[k];
+    }
+
+    // Pitch — target the right osc depending on mode
+    const driftFreq = midiToFreq(lastFiredMidi || 45) * Math.pow(2, rCurrent.pitch / 1200);
+    const activeOsc = (voiceMode === 'multi' && driftOscNode) ? driftOscNode : theOsc;
+    activeOsc.frequency.setTargetAtTime(driftFreq, now, 0.3);
+    activeOsc.detune.setTargetAtTime(rCurrent.detune, now, 0.1);
+
+    // Filter sweep from inherited position
+    const lfo1 = Math.sin((elapsed / (barSec * 1.0)) * Math.PI * 2 + lfo1Phase);
+    const lfoBlend = (lfo1 + 1) / 2;
+    const blended = rCurrent.filterFreq * 0.7 + (60 + lfoBlend * 8940) * 0.3;
+    theFilter.frequency.setTargetAtTime(Math.max(60, blended), now, 0.06);
+    theFilter.Q.setTargetAtTime(Math.max(0.4, rCurrent.filterQ), now, 0.06);
+    theNoiseGain.gain.setTargetAtTime(rCurrent.noise, now, 0.15);
+
+    // Wave morph on single osc mode only
+    if (voiceMode === 'single') {
+      const timeSince = now - lastWaveMorphTime;
+      if (!isMorphing && timeSince >= waveMorphInterval) {
+        isMorphing = true;
+        const nextStep = Math.random() < 0.15 ? -1 : 1;
+        waveIdx = (waveIdx + nextStep + waveSeq.length) % waveSeq.length;
+        const nextWave = waveSeq[waveIdx];
+        const morphEnv = (voiceMode === 'multi' && driftEnvNode) ? driftEnvNode : theEnv;
+        morphEnv.gain.cancelScheduledValues(now);
+        morphEnv.gain.setValueAtTime(morphEnv.gain.value, now);
+        morphEnv.gain.linearRampToValueAtTime(0.15, now + waveMorphDuration * 0.4);
+        const morphTarget = (voiceMode === 'multi' && driftOscNode) ? driftOscNode : theOsc;
+        setTimeout(() => { try { morphTarget.type = nextWave; } catch(e) {} }, waveMorphDuration * 0.4 * 1000);
+        morphEnv.gain.linearRampToValueAtTime(0.55, now + waveMorphDuration);
+      }
+      if (isMorphing && (now - lastWaveMorphTime) >= waveMorphInterval + waveMorphDuration) {
+        isMorphing = false; lastWaveMorphTime = now;
+        waveMorphInterval = barSec * (1.2 + Math.random() * 2.0);
+      }
+    }
+  }
+  animateDrift();
+}
+
+function stopDrift() {
+  if (!driftActive) return;
+  driftActive = false;
+  document.getElementById('driftBtn').classList.remove('active');
+  if (driftRafId) { cancelAnimationFrame(driftRafId); driftRafId = null; }
+
+  const rNow = audioCtx.currentTime;
+
+  // Fire the next step immediately so the beat snaps back in
+  if (isPlaying) {
+    const step = currentStep % loopLength;
+    const roleId = lockedPattern[step];
+    const midiNote = lockedMidi[step];
+    if (roleId && midiNote) {
+      if (voiceMode === 'single') fireNote(roleId, midiNote, rNow);
+      else fireNoteMulti(roleId, midiNote, rNow);
+    }
+    // Advance step and resync scheduler from now
+    currentStep = (step + 1) % loopLength;
+    nextStepTime = rNow + (60 / currentBPM) / 4;
+  } else {
+    // Not playing — just decay envelope
+    theEnv.gain.cancelScheduledValues(rNow);
+    theEnv.gain.setValueAtTime(theEnv.gain.value, rNow);
+    theEnv.gain.setTargetAtTime(0.0001, rNow, 0.08);
+  }
+
+  if (voiceMode === 'single') {
+    // Decay single osc envelope
+    theEnv.gain.cancelScheduledValues(rNow);
+    theEnv.gain.setValueAtTime(theEnv.gain.value, rNow);
+    theEnv.gain.setTargetAtTime(0.0001, rNow, 0.04);
+  } else {
+    // Stop the dedicated drift osc
+    if (driftEnvNode) {
+      driftEnvNode.gain.cancelScheduledValues(rNow);
+      driftEnvNode.gain.setValueAtTime(driftEnvNode.gain.value, rNow);
+      driftEnvNode.gain.linearRampToValueAtTime(0, rNow + 0.04);
+    }
+    if (driftOscNode) {
+      try { driftOscNode.stop(rNow + 0.05); } catch(e) {}
+      driftOscNode = null; driftEnvNode = null;
+    }
+  }
+
+  // Reset filter to neutral
+  theFilter.frequency.cancelScheduledValues(rNow);
+  theFilter.frequency.setTargetAtTime(800, rNow, 0.12);
+  theFilter.Q.cancelScheduledValues(rNow);
+  theFilter.Q.setTargetAtTime(2, rNow, 0.12);
+  filterFreqNow = 800; filterQNow = 2;
+  theNoiseGain.gain.cancelScheduledValues(rNow);
+  theNoiseGain.gain.setTargetAtTime(0, rNow, 0.05);
+}
+
+// ============================================================
+// LOOP RECALL
+// ============================================================
+const MAX_SLOTS = 8;
+const recallSlots = [];
+let activeSlotIdx = -1;
+let queuedSlotIdx = -1;
+
+function saveToNextSlot() {
+  if (activeSlotIdx >= 0 && recallSlots[activeSlotIdx]) {
+    if (recallSlots[activeSlotIdx].pattern.join(',') === lockedPattern.join(',')) return;
+  }
+  const slot = {
+    pattern:[...lockedPattern], midi:[...lockedMidi],
+    probMap:Object.assign({},currentProbMap),
+    phraseTension, phraseDirection, phraseRoot, rootNote, octaveBase,
+  };
+  if (recallSlots.length < MAX_SLOTS) {
+    recallSlots.push(slot);
+    activeSlotIdx = recallSlots.length - 1;
+  } else {
+    let oldest = (activeSlotIdx + 1) % MAX_SLOTS;
+    recallSlots[oldest] = slot;
+    activeSlotIdx = oldest;
+  }
+  renderSlots(); updateSlotStatus();
+}
+
+function recallSlot(idx) {
+  if (!recallSlots[idx]) return;
+  applySlot(idx);
+}
+
+function applySlot(idx) {
+  const slot = recallSlots[idx];
+  if (!slot) return;
+  lockedPattern=[...slot.pattern]; lockedMidi=[...slot.midi];
+  currentProbMap=Object.assign({},slot.probMap);
+  phraseTension=slot.phraseTension; phraseDirection=slot.phraseDirection;
+  phraseRoot=slot.phraseRoot; rootNote=slot.rootNote; octaveBase=slot.octaveBase;
+  activeSlotIdx=idx; queuedSlotIdx=-1;
+  updateBeatGridDots(); renderSlots(); updateSlotStatus();
+}
+
+function renderSlots() {
+  const container = document.getElementById('recallSlots');
+  if (!container) return;
+  container.innerHTML = '';
+  for (let i=0; i<MAX_SLOTS; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'slot-btn';
+    const num = document.createElement('span');
+    num.className = 'slot-num';
+    num.textContent = i+1;
+    btn.appendChild(num);
+    if (recallSlots[i]) {
+      btn.classList.add('filled');
+      if (i===activeSlotIdx) btn.classList.add('active');
+      if (i===queuedSlotIdx) btn.classList.add('queued');
+      btn.addEventListener('click', ()=>recallSlot(i));
+    }
+    container.appendChild(btn);
+  }
+}
+
+function updateSlotStatus() {
+  const el = document.getElementById('slotStatus');
+  if (!el) return;
+  if (queuedSlotIdx>=0) el.textContent='queued → '+(queuedSlotIdx+1);
+  else if (activeSlotIdx>=0) el.textContent='playing '+(activeSlotIdx+1)+' / '+recallSlots.length;
+  else el.textContent = recallSlots.length ? recallSlots.length+' stored' : '— empty —';
 }
 
 // ============================================================
@@ -1309,24 +1791,51 @@ function initBeatGrid() {
   for(let i=0;i<16;i++){
     const d=document.createElement('div');
     d.className='beat-dot'; d.id='dot'+i;
+    d.addEventListener('click', ()=>setLoopLength(i+1));
+    const num=document.createElement('span');
+    num.className='beat-dot-num';
+    num.textContent=i+1;
+    d.appendChild(num);
     grid.appendChild(d);
   }
   updateBeatGridDots();
+  updateLoopLengthMarker();
+}
+
+function setLoopLength(len) {
+  loopLength = Math.max(1, Math.min(16, len));
+  // If sequencer is ahead of new length, snap back
+  currentStep = currentStep % loopLength;
+  updateLoopLengthMarker();
+}
+
+function updateLoopLengthMarker() {
+  for (let i=0; i<16; i++) {
+    const d = document.getElementById('dot'+i);
+    if (!d) continue;
+    if (i === loopLength-1) {
+      d.classList.add('loop-end');
+    } else {
+      d.classList.remove('loop-end');
+    }
+    // Dim dots beyond loop length
+    if (i >= loopLength) {
+      d.style.opacity = '0.2';
+    } else {
+      d.style.opacity = '';
+    }
+  }
 }
 
 function updateBeatGridDots() {
   for(let i=0;i<16;i++){
     const d=document.getElementById('dot'+i);
     if(!d) continue;
-    const rid = lockedPattern[i];
-    if(rid) {
-      d.classList.add('active');
-      d.style.setProperty('--dot-color', ROLE_COLORS[rid] || 'var(--accent)');
-    } else {
-      d.classList.remove('active');
-      d.style.removeProperty('--dot-color');
-    }
+    const rid=lockedPattern[i];
+    if(rid){d.classList.add('active');d.style.setProperty('--dot-color',ROLE_COLORS[rid]||'var(--accent)');}
+    else{d.classList.remove('active');d.style.removeProperty('--dot-color');}
   }
+  updateLoopLengthMarker();
 }
 
 // ============================================================
@@ -1337,25 +1846,21 @@ function startWaveformLoop() {
   if(!canvas) return;
   const ctx2=canvas.getContext('2d');
   const dpr=window.devicePixelRatio||1;
-  canvas.width=canvas.offsetWidth*dpr; canvas.height=60*dpr;
+  canvas.width=canvas.offsetWidth*dpr; canvas.height=42*dpr;
   ctx2.scale(dpr,dpr);
-  const W=canvas.offsetWidth, H=60;
-  const buf=new Float32Array(analyserNode.fftSize);
+  const W=canvas.offsetWidth, H=42;
+  const buf=new Float32Array(theAnalyser.fftSize);
   function draw(){
     requestAnimationFrame(draw);
     ctx2.clearRect(0,0,W,H);
     if(!isPlaying){
-      ctx2.strokeStyle='rgba(200,150,42,0.2)'; ctx2.lineWidth=1;
-      ctx2.beginPath(); ctx2.moveTo(0,H/2); ctx2.lineTo(W,H/2); ctx2.stroke(); return;
+      ctx2.strokeStyle='rgba(0,255,157,0.2)'; ctx2.lineWidth=1;
+      ctx2.beginPath();ctx2.moveTo(0,H/2);ctx2.lineTo(W,H/2);ctx2.stroke(); return;
     }
-    analyserNode.getFloatTimeDomainData(buf);
-    // Phosphor green — intensity pulses with amplitude
-    const grad = ctx2.createLinearGradient(0,0,W,0);
-    grad.addColorStop(0,   '#004d28');
-    grad.addColorStop(0.2, '#00ff9d');
-    grad.addColorStop(0.5, '#00ffb3');
-    grad.addColorStop(0.8, '#00ff9d');
-    grad.addColorStop(1,   '#004d28');
+    theAnalyser.getFloatTimeDomainData(buf);
+    const grad=ctx2.createLinearGradient(0,0,W,0);
+    grad.addColorStop(0,'#004d28'); grad.addColorStop(0.2,'#00ff9d');
+    grad.addColorStop(0.5,'#00ffb3'); grad.addColorStop(0.8,'#00ff9d'); grad.addColorStop(1,'#004d28');
     ctx2.strokeStyle=grad; ctx2.lineWidth=1.5;
     ctx2.shadowColor='#00ff9d'; ctx2.shadowBlur=8;
     ctx2.beginPath();
@@ -1372,437 +1877,28 @@ function initVU() {
   const strip=document.getElementById('vuStrip');
   if(!strip) return;
   strip.innerHTML='';
-  for(let i=0;i<24;i++){
-    const b=document.createElement('div');
-    b.className='vu-bar'; strip.appendChild(b);
-  }
+  for(let i=0;i<24;i++){const b=document.createElement('div');b.className='vu-bar';strip.appendChild(b);}
 }
 
 function startVU() {
-  const buf=new Float32Array(analyserNode.fftSize);
+  const buf=new Float32Array(theAnalyser.fftSize);
   function anim(){
     requestAnimationFrame(anim);
     const bars=document.querySelectorAll('.vu-bar');
     if(!isPlaying){bars.forEach(b=>b.style.transform='scaleY(0.07)');return;}
-    analyserNode.getFloatTimeDomainData(buf);
+    theAnalyser.getFloatTimeDomainData(buf);
     const chunk=Math.floor(buf.length/bars.length);
     bars.forEach((bar,i)=>{
       let s=0;
       for(let j=i*chunk;j<(i+1)*chunk;j++) s+=Math.abs(buf[j]||0);
       const v=Math.min(1,(s/chunk)*2.5);
       bar.style.transform='scaleY('+Math.max(0.07,v)+')';
-      // Green spectrum — dark to bright phosphor
-      const vuColors = ['#004d20','#006b2a','#009940','#00cc55','#00ff6a','#00ff9d','#33ffb0','#80ffd0'];
-      const ci = Math.floor((i / bars.length) * vuColors.length);
-      bar.style.background = v > 0.07 ? vuColors[Math.min(ci, vuColors.length-1)] : 'var(--border)';
+      const vuColors=['#004d20','#006b2a','#009940','#00cc55','#00ff6a','#00ff9d','#33ffb0','#80ffd0'];
+      const ci=Math.floor((i/bars.length)*vuColors.length);
+      bar.style.background=v>0.07?vuColors[Math.min(ci,vuColors.length-1)]:'var(--border)';
     });
   }
   anim();
-}
-
-
-// ============================================================
-// LOOP RECALL — 8 slots, auto-saved on randomize
-// ============================================================
-const MAX_SLOTS = 8;
-const recallSlots = []; // each: { pattern, midi, probMap, phraseRoot, phraseTension, phraseDirection, rootNote, octaveBase }
-let activeSlotIdx = -1; // currently playing slot (-1 = live)
-let queuedSlotIdx = -1; // queued for next bar
-
-function saveToNextSlot() {
-  // If we're already playing a saved slot, don't re-save it
-  if (activeSlotIdx >= 0 && recallSlots[activeSlotIdx]) {
-    const existing = recallSlots[activeSlotIdx];
-    const samePattern = existing.pattern.join(',') === lockedPattern.join(',');
-    if (samePattern) return; // identical — skip
-  }
-
-  const slot = {
-    pattern: [...lockedPattern],
-    midi:    [...lockedMidi],
-    probMap: Object.assign({}, currentProbMap),
-    phraseTension, phraseDirection, phraseRoot,
-    rootNote, octaveBase,
-  };
-  if (recallSlots.length < MAX_SLOTS) {
-    recallSlots.push(slot);
-    activeSlotIdx = recallSlots.length - 1;
-  } else {
-    // Find oldest non-active slot to overwrite
-    let oldest = (activeSlotIdx + 1) % MAX_SLOTS;
-    recallSlots[oldest] = slot;
-    activeSlotIdx = oldest;
-  }
-  renderSlots();
-  updateSlotStatus();
-}
-
-function recallSlot(idx) {
-  if (!recallSlots[idx]) return;
-  // Apply immediately — mid-loop swap sounds like another morph event
-  applySlot(idx);
-}
-
-function applySlot(idx) {
-  const slot = recallSlots[idx];
-  if (!slot) return;
-  lockedPattern  = [...slot.pattern];
-  lockedMidi     = [...slot.midi];
-  currentProbMap = Object.assign({}, slot.probMap);
-  phraseTension  = slot.phraseTension;
-  phraseDirection = slot.phraseDirection;
-  phraseRoot     = slot.phraseRoot;
-  rootNote       = slot.rootNote;
-  octaveBase     = slot.octaveBase;
-  activeSlotIdx  = idx;
-  queuedSlotIdx  = -1;
-  updateBeatGridDots();
-  renderSlots();
-  updateSlotStatus();
-}
-
-function renderSlots() {
-  const container = document.getElementById('recallSlots');
-  if (!container) return;
-  container.innerHTML = '';
-  for (let i = 0; i < MAX_SLOTS; i++) {
-    const btn = document.createElement('button');
-    btn.className = 'slot-btn';
-    const num = document.createElement('span');
-    num.className = 'slot-num';
-    num.textContent = i + 1;
-    btn.appendChild(num);
-
-    if (recallSlots[i]) {
-      btn.classList.add('filled');
-      if (i === activeSlotIdx) btn.classList.add('active');
-      if (i === queuedSlotIdx) btn.classList.add('queued');
-      btn.addEventListener('click', () => recallSlot(i));
-    }
-    container.appendChild(btn);
-  }
-}
-
-function updateSlotStatus() {
-  const el = document.getElementById('slotStatus');
-  if (!el) return;
-  if (queuedSlotIdx >= 0) {
-    el.textContent = 'queued → ' + (queuedSlotIdx + 1);
-  } else if (activeSlotIdx >= 0) {
-    el.textContent = 'playing ' + (activeSlotIdx + 1) + ' / ' + recallSlots.length;
-  } else {
-    el.textContent = recallSlots.length ? recallSlots.length + ' stored' : '— empty —';
-  }
-}
-
-
-
-// ============================================================
-// DRIFT ENGINE
-// Hold DRIFT to suspend the sequencer and let the filter/osc
-// slowly wander in tempo-synced LFO patterns until released.
-// ============================================================
-let driftActive = false;
-let driftOsc = null;
-let driftEnv = null;
-let driftMorphOsc = null;  // module-scoped so stopDrift can access
-let driftLFO = null;
-let driftFilterLFO = null;
-let driftQLFO = null;
-let driftRafId = null;
-let driftPhase = 0;
-let stopDriftNoiseFn = null; // module-scoped noise stopper
-
-function startDrift() {
-  if (!audioCtx || driftActive) return;
-  driftActive = true;
-
-  const btn = document.getElementById('driftBtn');
-  if (btn) btn.classList.add('active');
-
-  // Mute loop, bring in drift on its own output
-  const dNow = audioCtx.currentTime;
-  masterGain.gain.cancelScheduledValues(dNow);
-  masterGain.gain.setValueAtTime(masterGain.gain.value, dNow);
-  masterGain.gain.linearRampToValueAtTime(0, dNow + 0.06);
-  driftMasterGain.gain.cancelScheduledValues(dNow);
-  driftMasterGain.gain.setValueAtTime(0, dNow);
-  driftMasterGain.gain.linearRampToValueAtTime(0.38, dNow + 0.08);
-
-  const t = audioCtx.currentTime;
-  const stepSec = (60 / currentBPM) / 4;
-  const barSec = stepSec * 16;
-
-  // === Inherit exact current synth state ===
-  // Wave: whatever just fired
-  const driftWave = lastFiredWave || 'sine';
-
-  // Frequency: last midi note that fired, exact pitch
-  const baseFreq = lastFiredMidi ? midiToFreq(lastFiredMidi) : midiToFreq(48);
-
-  // Filter: start exactly where filter currently is, then drift FROM there
-  const startFilterFreq = filterFreqNow;
-  const startFilterQ    = filterQNow;
-
-  // Noise: inherit current noise level
-  const startNoise = noiseGainNode.gain.value;
-
-  // Spawn oscillator with same wave type and pitch — sounds like the note is held
-  driftOsc = audioCtx.createOscillator();
-  driftOsc.type = driftWave;
-  driftOsc.frequency.setValueAtTime(baseFreq, t);
-
-  // Amp: crossfade in quickly (sounds like the note just sustained)
-  driftEnv = audioCtx.createGain();
-  driftEnv.gain.setValueAtTime(0, t);
-  driftEnv.gain.linearRampToValueAtTime(0.35, t + 0.06);
-
-  // Drift noise — own source so it doesn't interfere with loop noise
-  const driftNoiseBuf = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
-  const dnd = driftNoiseBuf.getChannelData(0);
-  for (let i = 0; i < dnd.length; i++) dnd[i] = Math.random() * 2 - 1;
-  const driftNoiseSrc = audioCtx.createBufferSource();
-  driftNoiseSrc.buffer = driftNoiseBuf;
-  driftNoiseSrc.loop = true;
-  const driftNoiseGain = audioCtx.createGain();
-  driftNoiseGain.gain.setValueAtTime(startNoise, t);
-  driftNoiseSrc.connect(driftNoiseGain);
-  driftNoiseGain.connect(driftFilter);
-  driftNoiseSrc.start();
-
-  // Stop drift noise on release
-  stopDriftNoiseFn = () => {
-    try { driftNoiseSrc.stop(); } catch(e) {}
-  };
-
-  // Drift: osc → env → driftFilter → driftShaper → driftMasterGain
-  driftOsc.connect(driftEnv);
-  driftEnv.connect(driftFilter);
-  driftOsc.start(t);
-
-  // Seed driftFilter with current filter state so it starts from the right place
-  driftFilter.frequency.setValueAtTime(startFilterFreq, t);
-  driftFilter.Q.setValueAtTime(startFilterQ, t);
-
-  // LFO ranges orbit around the inherited filter position
-  // — drift stays in the character of the sound that triggered it
-  const filterCenter = Math.max(120, Math.min(4000, startFilterFreq));
-  const filterDepth  = filterCenter * 0.7; // ±70% of current position
-  const filterLow    = Math.max(80,   filterCenter - filterDepth);
-  const filterHigh   = Math.min(8000, filterCenter + filterDepth);
-  const qCenter      = Math.max(0.5, startFilterQ);
-
-  // Noise drift orbits current noise level
-  const noiseLow  = Math.max(0, startNoise - 0.05);
-  const noiseHigh = Math.min(0.5, startNoise + 0.25);
-
-  // Wave sequence — drift cycles through these
-  const waveSequence = ['sine', 'triangle', 'sawtooth', 'square', 'triangle', 'sawtooth', 'sine'];
-  let waveIdx = Math.max(0, waveSequence.indexOf(driftWave));
-  driftMorphOsc = null;
-  let isMorphing = false;
-  let lastWaveMorphTime = t; // first morph after waveMorphInterval, not immediately
-  let waveMorphInterval = barSec * 1.2;
-  const waveMorphDuration = barSec * 2.5;
-
-  // Filter sweep roams the full spectrum but STARTS at the inherited position
-  const filterFloor = 60;
-  const filterCeil  = 9000;
-
-  // Calculate LFO phase offset so combo=startCombo at elapsed=0
-  // sweepFreq = filterFloor * (filterCeil/filterFloor)^expCombo
-  // Solve for startCombo given startFilterFreq
-  const startCombo = Math.pow(
-    Math.log(Math.max(filterFloor, startFilterFreq) / filterFloor) /
-    Math.log(filterCeil / filterFloor),
-    2  // inverse of pow(combo, 0.5)
-  );
-  // Use startCombo to back-calculate a phase offset for lfo1 (dominant LFO)
-  // combo = (lfo1*0.5 + lfo2*0.35 + lfo3*0.15 + 1) / 2
-  // At t=0, lfo2 and lfo3 have phase offsets 1.2 and 2.5 so they're non-zero
-  // We offset lfo1 phase so the sum lands on startCombo
-  const lfo2at0 = Math.sin(1.2) * 0.35;
-  const lfo3at0 = Math.sin(2.5) * 0.15;
-  const lfo1needed = (startCombo * 2 - 1 - lfo2at0 - lfo3at0) / 0.5;
-  const lfo1Phase = Math.asin(Math.max(-1, Math.min(1, lfo1needed)));
-
-  function spawnMorphOsc(waveType) {
-    const o = audioCtx.createOscillator();
-    o.type = waveType;
-    const currentFreq = driftOsc ? driftOsc.frequency.value : baseFreq;
-    o.frequency.setValueAtTime(currentFreq, audioCtx.currentTime);
-    const g = audioCtx.createGain();
-    g.gain.setValueAtTime(0.001, audioCtx.currentTime);
-    o.connect(g);
-    g.connect(driftFilter);
-    o.start();
-    return { osc: o, env: g };
-  }
-
-  // Random LFO targets — re-rolled periodically for unpredictability
-  // Each parameter wanders independently toward a random target
-  let rTargets = {
-    filterFreq:  startFilterFreq,
-    filterQ:     startFilterQ,
-    pitch:       0,        // cents offset
-    noise:       startNoise,
-    volume:      0.35,
-    detune:      0,        // extra osc detune for beating/chorus
-  };
-  let rCurrent = { ...rTargets };
-  let rRollTimes = {};     // when each param next picks a new target
-  const rIntervals = {     // how often each param picks new target (in seconds)
-    filterFreq:  () => barSec * (0.4 + Math.random() * 1.8),
-    filterQ:     () => barSec * (0.3 + Math.random() * 1.2),
-    pitch:       () => barSec * (3.0 + Math.random() * 4.0),   // slow
-    noise:       () => barSec * (0.6 + Math.random() * 1.5),
-    volume:      () => barSec * (0.8 + Math.random() * 2.0),
-    detune:      () => barSec * (1.0 + Math.random() * 2.5),
-  };
-  const rRanges = {        // target ranges per param
-    filterFreq:  () => 60 + Math.random() * 8940,    // full spectrum
-    filterQ:     () => 0.5 + Math.random() * 20,
-    pitch:       () => (Math.random() - 0.5) * 80,   // ±40 cents max
-    noise:       () => Math.random() * 0.45,
-    volume:      () => 0.15 + Math.random() * 0.35,
-    detune:      () => (Math.random() - 0.5) * 24,   // ±12 cents detune
-  };
-  const rSpeeds = {        // lerp speed (lower = slower/smoother)
-    filterFreq:  0.04,
-    filterQ:     0.06,
-    pitch:       0.008,
-    noise:       0.03,
-    volume:      0.02,
-    detune:      0.015,
-  };
-
-  // Init roll times so everything starts moving immediately
-  for (const k in rIntervals) rRollTimes[k] = t;
-
-  function animateDrift() {
-    if (!driftActive) return;
-    driftRafId = requestAnimationFrame(animateDrift);
-
-    const now = audioCtx.currentTime;
-    const elapsed = now - t;
-
-    // === Roll new random targets when interval expires ===
-    for (const k in rIntervals) {
-      if (now >= rRollTimes[k]) {
-        rTargets[k] = rRanges[k]();
-        rRollTimes[k] = now + rIntervals[k]();
-      }
-      // Smooth lerp toward target
-      rCurrent[k] += (rTargets[k] - rCurrent[k]) * rSpeeds[k];
-    }
-
-    // === Pitch drift ===
-    const driftFreq = baseFreq * Math.pow(2, rCurrent.pitch / 1200);
-    if (driftOsc)      driftOsc.frequency.setTargetAtTime(driftFreq, now, 0.2);
-    if (driftMorphOsc) driftMorphOsc.osc.frequency.setTargetAtTime(driftFreq, now, 0.2);
-
-    // === Detune — creates chorus/beating between drift and morphOsc ===
-    if (driftOsc)      driftOsc.detune.setTargetAtTime(rCurrent.detune, now, 0.1);
-    if (driftMorphOsc) driftMorphOsc.osc.detune.setTargetAtTime(-rCurrent.detune, now, 0.1); // opposite
-
-    // === Filter ===
-    // Blend LFO phase with random target for continuous + spontaneous movement
-    const lfo1 = Math.sin((elapsed / (barSec * 1.0)) * Math.PI * 2 + lfo1Phase);
-    const lfoBlend = (lfo1 + 1) / 2;  // 0..1
-    const blendedFreq = rCurrent.filterFreq * 0.7 + (filterFloor + lfoBlend * (9000 - filterFloor)) * 0.3;
-    driftFilter.frequency.setTargetAtTime(Math.max(60, blendedFreq), now, 0.06);
-    driftFilter.Q.setTargetAtTime(Math.max(0.4, rCurrent.filterQ), now, 0.06);
-
-    // === Noise ===
-    driftNoiseGain.gain.setTargetAtTime(Math.min(0.5, rCurrent.noise), now, 0.1);
-
-    // === Volume — only breathe when not mid-morph crossfade ===
-    if (driftEnv && !isMorphing) driftEnv.gain.setTargetAtTime(rCurrent.volume, now, 0.08);
-
-    // === Wave morph: random interval, random next wave ===
-    const timeSinceLastMorph = now - lastWaveMorphTime;
-    if (!isMorphing && timeSinceLastMorph >= waveMorphInterval) {
-      isMorphing = true;
-      // Step through sequence in order — hear the evolution sine→tri→saw→square→...
-      // Occasionally skip forward or reverse for surprise
-      const step = Math.random() < 0.15 ? -1 : 1;
-      waveIdx = (waveIdx + step + waveSequence.length) % waveSequence.length;
-
-      driftMorphOsc = spawnMorphOsc(waveSequence[waveIdx]);
-      // Slow crossfade — sine bleeds into triangle bleeds into saw
-      // Both oscillators audible through most of the transition
-      const morphVol = Math.max(0.2, rCurrent.volume);
-      driftMorphOsc.env.gain.cancelScheduledValues(now);
-      driftMorphOsc.env.gain.setValueAtTime(0.001, now);
-      driftMorphOsc.env.gain.linearRampToValueAtTime(morphVol, now + waveMorphDuration * 0.8);
-      driftEnv.gain.cancelScheduledValues(now);
-      driftEnv.gain.setValueAtTime(driftEnv.gain.value, now);
-      driftEnv.gain.linearRampToValueAtTime(0.001, now + waveMorphDuration);
-
-      // Randomize next morph interval too
-      waveMorphInterval = barSec * (0.8 + Math.random() * 2.0);
-    }
-
-    if (isMorphing && driftMorphOsc) {
-      const morphElapsed = now - (lastWaveMorphTime + waveMorphInterval);
-      if (morphElapsed >= waveMorphDuration) {
-        try { driftOsc.stop(); } catch(e) {}
-        driftOsc      = driftMorphOsc.osc;
-        driftEnv      = driftMorphOsc.env;
-        driftMorphOsc = null;
-        isMorphing    = false;
-        lastWaveMorphTime = now;
-        waveMorphInterval = barSec * (1.5 + Math.random() * 2.5);
-      }
-    }
-  }
-
-  animateDrift();
-}
-
-function stopDrift() {
-  if (!driftActive) return;
-  driftActive = false;
-
-  const btn = document.getElementById('driftBtn');
-  if (btn) btn.classList.remove('active');
-
-  if (driftRafId) { cancelAnimationFrame(driftRafId); driftRafId = null; }
-
-  if (driftOsc && driftEnv) {
-    const st = audioCtx.currentTime;
-
-    // Re-route drift osc through the main filter so the next sequencer note
-    // morphs grab and transform it — sounds like the drift is "caught" by the beat
-    try {
-      driftEnv.disconnect();
-      driftEnv.connect(filterNode); // now subject to main filter morphs
-    } catch(e) {}
-
-    // Also kill morphOsc if mid-crossfade
-    if (driftMorphOsc) {
-      try { driftMorphOsc.env.gain.setTargetAtTime(0, st, 0.05); driftMorphOsc.osc.stop(st + 0.2); } catch(e) {}
-      driftMorphOsc = null;
-    }
-
-    // Let the drift osc ring briefly then stop — the next note's filter will shape its exit
-    driftEnv.gain.cancelScheduledValues(st);
-    driftEnv.gain.setValueAtTime(driftEnv.gain.value, st);
-    driftEnv.gain.setTargetAtTime(0, st + 0.05, 0.18); // slow fade, filter morph shapes it
-    try { driftOsc.stop(st + 0.8); } catch(e) {}
-    driftOsc = null;
-    driftEnv = null;
-    if (stopDriftNoiseFn) { try { stopDriftNoiseFn(); } catch(e) {} stopDriftNoiseFn = null; }
-  }
-
-  // Fade loop back in, fade drift out
-  const rNow = audioCtx.currentTime;
-  masterGain.gain.cancelScheduledValues(rNow);
-  masterGain.gain.setValueAtTime(masterGain.gain.value, rNow);
-  masterGain.gain.linearRampToValueAtTime(0.82, rNow + 0.08);
-  driftMasterGain.gain.cancelScheduledValues(rNow);
-  driftMasterGain.gain.setValueAtTime(driftMasterGain.gain.value, rNow);
-  driftMasterGain.gain.linearRampToValueAtTime(0, rNow + 0.25);
 }
 
 // ============================================================
@@ -1838,24 +1934,26 @@ document.getElementById('playBtn').addEventListener('click',function(){
   }
 });
 
-// Drift button — hold to drift, release to resume
+document.getElementById('modeToggle').addEventListener('click', function() {
+  setVoiceMode(voiceMode === 'single' ? 'multi' : 'single');
+});
+
+document.getElementById('randBtn').addEventListener('click',function(){
+  saveToNextSlot();
+  randomizeProbMap();
+  const btn=document.getElementById('randBtn');
+  btn.style.boxShadow='0 0 30px rgba(0,255,157,0.7)';
+  setTimeout(()=>{btn.style.boxShadow='';},300);
+});
+
 const driftBtn = document.getElementById('driftBtn');
-driftBtn.addEventListener('mousedown',  () => { if(audioCtx) startDrift(); });
-driftBtn.addEventListener('touchstart', (e) => { e.preventDefault(); if(audioCtx) startDrift(); }, { passive: false });
+driftBtn.addEventListener('mousedown',  ()=>{if(audioCtx)startDrift();});
+driftBtn.addEventListener('touchstart', (e)=>{e.preventDefault();if(audioCtx)startDrift();},{passive:false});
 driftBtn.addEventListener('mouseup',    stopDrift);
 driftBtn.addEventListener('mouseleave', stopDrift);
 driftBtn.addEventListener('touchend',   stopDrift);
 driftBtn.addEventListener('touchcancel',stopDrift);
 
-document.getElementById('randBtn').addEventListener('click',function(){
-  saveToNextSlot();    // save outgoing loop before it changes
-  randomizeProbMap(); // queues pendingPattern for next bar
-  const btn=document.getElementById('randBtn');
-  btn.style.borderColor='var(--accent)'; btn.style.color='var(--text)';
-  setTimeout(()=>{btn.style.borderColor='';btn.style.color='';},300);
-});
-
-// Morph slider — updates morphTime live, affects all subsequent note morphs immediately
 document.getElementById('morphSlider').addEventListener('input',function(){
   const ms=parseInt(this.value);
   morphTime=ms/1000;
@@ -1873,31 +1971,28 @@ document.getElementById('hiVolSlider').addEventListener('input',function(){
   const db=parseInt(this.value);
   hiVolDb=db;
   document.getElementById('hiVolVal').textContent=db+'dB';
-  if(hiShelfFilter) hiShelfFilter.gain.setTargetAtTime(db,audioCtx.currentTime,0.05);
+  if(theHiShelf) theHiShelf.gain.setTargetAtTime(db,audioCtx.currentTime,0.05);
 });
 
 document.getElementById('driveSlider').addEventListener('input',function(){
   const val=parseFloat(this.value);
   driveAmount=val;
   document.getElementById('driveVal').textContent=val.toFixed(2);
-  if(waveshaper) waveshaper.curve=makeDistCurve(val*180);
+  if(theShaper) theShaper.curve=makeDistCurve(val*180);
 });
 
-// Build initial pattern
-buildPattern(currentProbMap);
-commitPattern(buildPattern(currentProbMap));
+const built=buildPattern(currentProbMap);
+commitPattern(built);
 renderSlots();
 updateSlotStatus();
-// Randomize scale select on every page load
-(function() {
-  const sel = document.getElementById('scaleSelect');
-  if (!sel) return;
-  const opts = sel.querySelectorAll('option');
-  const pick = Math.floor(Math.random() * opts.length);
-  opts.forEach(o => o.removeAttribute('selected'));
-  opts[pick].selected = true;
-})();
 
+// Randomize scale on load
+(function(){
+  const sel=document.getElementById('scaleSelect');
+  if(!sel) return;
+  const opts=sel.querySelectorAll('option');
+  opts[Math.floor(Math.random()*opts.length)].selected=true;
+})();
 </script>
 </body>
 </html>
